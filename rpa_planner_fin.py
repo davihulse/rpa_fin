@@ -21,12 +21,12 @@ from selenium.common.exceptions import TimeoutException
 import os
 #import ctypes
 #import win32com.client as win32
-#import gspread
+import gspread
 #import csv
 
 def criar_driver(pasta_downloads):
     options = Options()
-    #options.add_argument("--headless")
+    options.add_argument("--headless")
     options.add_argument("--window-size=1920,1080")
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-notifications")
@@ -199,6 +199,33 @@ def consolidar_planilhas(pasta_downloads):
     return df_final
 
 #######################
+
+
+#Acessar Dados do RPA no Google Sheets
+gc = gspread.service_account(filename=os.path.join(os.path.dirname(os.getcwd()), 'crested-century-386316-01c90985d6e4.json'))
+
+#Dados Aquisições RPA
+spreadsheet = gc.open("Acompanhamento_Aquisições_RPA")
+worksheet = spreadsheet.worksheet("Dados")
+
+dados_rpa = worksheet.get_all_values()
+df_dados_rpa = pd.DataFrame(dados_rpa[1:], columns=dados_rpa[0])
+df_dados_rpa['Valor R$'] = df_dados_rpa['Valor R$'].str.replace('.', '', regex=False)
+
+#df_dados_rpa = pd.DataFrame(dados_rpa)
+#df_dados_rpa["Valor R$"] = df_dados_rpa["Valor R$"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False).astype(float)
+#df_dados_rpa["Valor R$"] = df_dados_rpa["Valor R$"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False).astype(float)
+
+
+
+
+
+
+#Dados Aquisições RPA - planilha destino
+spreadsheet_fin = gc.open("Acompanhamento_FIN_RPA")
+worksheet_fins = spreadsheet_fin.worksheet("Dados")
+
+
     
 planners_urls = [
     "https://planner.cloud.microsoft/webui/plan/QXrbRoU7UEGdjE_bhw-QY2QAFn9X/view/board?tid=2cf7d4d5-bd1b-4956-acf8-2995399b2168",
@@ -254,11 +281,11 @@ df["FIN"] = df["Itens da lista de verificação"].apply(extrair_fin)
 
 
 #### Bloco apenas para organizar colunas, pode ser removido depois:
-colunas = df.columns.tolist()
-idx = colunas.index("Nome da tarefa")
-colunas.remove("Numero Tarefa")
-colunas.insert(idx + 1, "Numero Tarefa")
-df = df[colunas]
+# colunas = df.columns.tolist()
+# idx = colunas.index("Nome da tarefa")
+# colunas.remove("Numero Tarefa")
+# colunas.insert(idx + 1, "Numero Tarefa")
+# df = df[colunas]
 
 
 #df.to_excel("df.xlsx", index=False)
@@ -419,15 +446,24 @@ def extrai_fin(numfin):
     #Campos a extrair
     campos = [
         ("Número do FIN", '//*[@id="field_8a3449076f9f6db3016fe74952d0181b"]'),
+        ("Data da Abertura do FIN", '//*[@id="field_8a3449076f9f6db3016fa46bce563614"]'),
+        ("Tipo de Documento", '//*[@id="oidzoom_8a34490772df4a7a0172eb5952b56c38"]'),
+        ("Especificação", '//*[@id="oidzoom_8a3449077843843601785b0a8d400c5c"]'),
+        ("Valor pago por Adiantamento?", '//*[@id="oidzoom_8a34490770c96a380170cfe876536a31"]'),
+        ("Filial Faturada", '//*[@id="nmwebservice_1951471w1w212"]'),
         ("CNPJ Fornecedor", '//*[@id="field_8a3449076f9f6db3016fe747b2fe17cf"]'),
         ("Número do documento", '//*[@id="field_8a3449077918207d017980762ad719ba"]'),
-        ("Ordem de compra", '//*[@id="field_8a3449076f9f6db301701adda4b73de1"]'),
-        ("Nr. do documento (CAP)", '//*[@id="field_8a344907739c40c101743078077162ed"]'),
+        ("Tipo de Compra", '//*[@id="oidzoom_8a3449076f9f6db301701a5907032a88"]'),
+        ("Ordem de compra (FIN)", '//*[@id="field_8a3449076f9f6db301701adda4b73de1"]'),
+        ("RNs", '//*[@id="field_8a3449076f9f6db3016fe7454ab71792"]'),
+        ("Observações", '//*[@id="field_8a344907739c40c10174300c129a4832"]'),
         ("Número AP", '//*[@id="field_8a3449076f9f6db3016fe735db491529"]'),
         ("Data Agendada para Pagamento", '//*[@id="field_8a3449076f9f6db301701a9b6d9c3533"]'),
+        ("Competência", '//*[@id="field_8a3449076f9f6db301701a6bdc3e2e27"]'),
         ("Valor Bruto a Pagar (R$)", '//*[@id="field_8a34490770c96a380170e426eed86216"]'),
         ("Valor a deduzir (R$)", '//*[@id="field_8a34490770c96a380170e427cc6e6266"]'),
-        ("Valor Líquido a Pagar (R$)", '//*[@id="field_8a34490770c96a380170e4277bfb623e"]')
+        ("Valor Líquido a Pagar (R$)", '//*[@id="field_8a34490770c96a380170e4277bfb623e"]'),
+        ("Nr. do documento (CAP)", '//*[@id="field_8a344907739c40c101743078077162ed"]')
     ]
                
     for nome, xpath in campos:
@@ -449,7 +485,7 @@ def extrai_fin(numfin):
     
     print("Descrição: ", dados_dos_chamados["Descrição"])
     print("Número do FIN: ", dados_dos_chamados["Número do FIN"])
-    print("Valor Líquido: ", dados_dos_chamados["Valor Líquido"])
+    print("Valor Líquido a Pagar (R$): ", dados_dos_chamados["Valor Líquido a Pagar (R$)"])
     print("Status: ", dados_dos_chamados["Status"])
 
     print("Dados do ", numfin, " extraídos.")
@@ -457,25 +493,201 @@ def extrai_fin(numfin):
     return dados_dos_chamados
 
 
+def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fins):
+
+    colunas_esperadas = [
+        # --- Dados da Aquisição ---
+        "Código Unidade",
+        "Identificador",
+        "Apelido Projeto",
+        "Descrição",
+        "Fonte",
+        "Rubrica",
+        "Valor Aquisição R$",
+        "Ordem de Compra (Aquisição)",
+        # --- Dados do FIN ---
+        "Número do FIN",
+        "Descrição FIN",
+        "Status FIN",
+        "Data da Abertura do FIN",
+        "Tipo de Documento",
+        "Especificação",
+        "Valor pago por Adiantamento?",
+        "Filial Faturada",
+        "CNPJ Fornecedor",
+        "Número do documento",
+        "Tipo de Compra",
+        "Ordem de compra (FIN)",
+        "RNs",
+        "Observações",
+        "Número AP",
+        "Data Agendada para Pagamento",
+        "Competência",
+        "Valor Bruto a Pagar (R$)",
+        "Valor a deduzir (R$)",
+        "Valor Líquido a Pagar (R$)",
+        "Nr. do documento (CAP)"
+    ]
+
+    # Limpeza de strings
+    for origem in (dados_fin, dados_aquisicao):
+        for k, v in origem.items():
+            if isinstance(v, str):
+                origem[k] = v.replace("\n", " ").strip()
+
+    linha = {
+        # --- Aquisição ---
+        "Código Unidade": dados_aquisicao.get("Código Unidade", ""),
+        "Identificador": dados_aquisicao.get("Identificador", ""),
+        "Apelido Projeto": dados_aquisicao.get("Apelido Projeto", ""),
+        "Descrição": dados_aquisicao.get("Descrição", ""),
+        "Fonte": dados_aquisicao.get("Fonte", ""),
+        "Rubrica": dados_aquisicao.get("Rubrica", ""),
+        "Valor Aquisição R$": dados_aquisicao.get("Valor R$", ""),
+        "Ordem de Compra (Aquisição)": dados_aquisicao.get("Ordem de Compra", ""),
+        # --- FIN ---
+        "Número do FIN": dados_fin.get("Número do FIN", ""),
+        "Descrição FIN": dados_fin.get("Descrição", ""),
+        "Status FIN": dados_fin.get("Status", ""),
+        "Data da Abertura do FIN": dados_fin.get("Data da Abertura do FIN", ""),
+        "Tipo de Documento": dados_fin.get("Tipo de Documento", ""),
+        "Especificação": dados_fin.get("Especificação", ""),
+        "Valor pago por Adiantamento?": dados_fin.get("Valor pago por Adiantamento?", ""),
+        "Filial Faturada": dados_fin.get("Filial Faturada", ""),
+        "CNPJ Fornecedor": dados_fin.get("CNPJ Fornecedor", ""),
+        "Número do documento": dados_fin.get("Número do documento", ""),
+        "Tipo de Compra": dados_fin.get("Tipo de Compra", ""),
+        "Ordem de compra (FIN)": dados_fin.get("Ordem de compra (FIN)", ""),
+        "RNs": dados_fin.get("RNs", ""),
+        "Observações": dados_fin.get("Observações", ""),
+        "Número AP": dados_fin.get("Número AP", ""),
+        "Data Agendada para Pagamento": dados_fin.get("Data Agendada para Pagamento", ""),
+        "Competência": dados_fin.get("Competência", ""),
+        "Valor Bruto a Pagar (R$)": dados_fin.get("Valor Bruto a Pagar (R$)", ""),
+        "Valor a deduzir (R$)": dados_fin.get("Valor a deduzir (R$)", ""),
+        "Valor Líquido a Pagar (R$)": dados_fin.get("Valor Líquido a Pagar (R$)", ""),
+        "Nr. do documento (CAP)": dados_fin.get("Nr. do documento (CAP)", "")
+    }
+
+    linha_ordenada = [linha.get(col, "") for col in colunas_esperadas]
+
+    # Leitura existente
+    valores_existentes = worksheet_fins.get_all_records()
+    df_existente = pd.DataFrame(valores_existentes)
+
+    if not df_existente.empty and "Número do FIN" in df_existente.columns:
+        fins_existentes = df_existente["Número do FIN"].astype(str).tolist()
+    else:
+        fins_existentes = []
+
+    numero_fin = str(linha["Número do FIN"])
+
+    if numero_fin in fins_existentes:
+        idx = fins_existentes.index(numero_fin)
+        linha_planilha = idx + 2  # header + base 1
+        worksheet_fins.update(
+            values=[linha_ordenada],
+            range_name=f"A{linha_planilha}"
+        )
+        print(f"🔁 FIN {numero_fin} atualizado na linha {linha_planilha}.")
+    else:
+        worksheet_fins.append_row(linha_ordenada)
+        print(f"➕ FIN {numero_fin} inserido como nova linha.")
+
+############Teste com dois FIN's
+
 login_sesuite()
 
-lista_fin = ["FIN.778678/26", "FIN.764097/25"]
+#lista_fin = ["FIN.778678/26", "FIN.764097/25"]
 
-for idx, numero in enumerate(lista_fin):
-    print(f"[{idx+1}/{len(lista_fin)}] Acessando FIN {numero}")
-    extrai_fin(numero)
+# Seleciona dois FINs para teste
+#lista_fin_teste = ["FIN.778678/26", "FIN.764097/25"]
 
-    # if dados_dos_chamados:
-    #     registrar_chamado(
-    #         dados_dos_chamados,
-    #         atividade=atividadehabilitada[idx],
-    #         descricao=objetos_compra[idx],
-    #         identificador=str(numero),
-    #         hoje=hoje,
-    #         remover_manual=False
-    #     )
+# Simula o df de aquisições já carregado (df)
+# Aqui vamos buscar as informações da aquisição com base no Numero Tarefa
+# for idx, fin in enumerate(lista_fin_teste):
+#     print(f"[{idx+1}/{len(lista_fin_teste)}] Acessando FIN {fin}")
 
-print("✅ Encerrada a extração dos FIN.")
+#     dados_fin = extrai_fin(fin)
+#     if not dados_fin:
+#         print(f"❌ Falha ao extrair dados do FIN {fin}.")
+#         continue
+
+#     # Tentativa de match por "FIN" ou "Numero Tarefa"
+#     linha_aquisicao = df[df["FIN"] == fin]
+#     if linha_aquisicao.empty:
+#         print(f"⚠️ Aquisição correspondente ao FIN {fin} não encontrada na planilha consolidada.")
+#         continue
+
+#     dados_aquisicao = linha_aquisicao.iloc[0].to_dict()
+
+#     registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fins)
+
+# print("✅ Teste de extração de dois FINs concluído.")
+########################## Fim do teste
+
+######### teste 2
+# Normaliza campo para busca
+#df["Numero Tarefa"] = df["Numero Tarefa"].astype(str).str.zfill(6)
+#df_dados_rpa["Numero Tarefa"] = df_dados_rpa["Numero Tarefa"].astype(str).str.zfill(6)
+
+# Lista de FINs para testar
+lista_fin_teste = ["FIN.778678/26", "FIN.764097/25", "FIN.742971/25", "FIN.742985/25", "FIN.742975/25"]
+
+for idx, fin in enumerate(lista_fin_teste):
+    print(f"[{idx+1}/{len(lista_fin_teste)}] Acessando FIN {fin}")
+    
+    dados_fin = extrai_fin(fin)
+    if not dados_fin:
+        print(f"❌ Falha ao extrair dados do FIN {fin}.")
+        continue
+
+    # Busca a linha do df que contém o FIN
+    linha_com_fin = df[df["FIN"] == fin]
+    if linha_com_fin.empty:
+        print(f"⚠️ FIN {fin} não encontrado na planilha consolidada. Pulando.")
+        continue
+
+    numero_tarefa = linha_com_fin.iloc[0]["Numero Tarefa"]
+
+    # Agora busca os dados da aquisição pelo Numero Tarefa
+    linha_aquisicao = df_dados_rpa[df_dados_rpa["Identificador"].astype(str).str.zfill(6) == str(numero_tarefa).zfill(6)]
+
+    if linha_aquisicao.empty:
+        print(f"⚠️ Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}. Pulando.")
+        continue
+
+    dados_aquisicao = linha_aquisicao.iloc[0].to_dict()
+
+    registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fins)
+
+
+######### /teste 2
+
+
+
+
+
+# for idx, numero in enumerate(lista_fin):
+#     print(f"[{idx+1}/{len(lista_fin)}] Acessando FIN {numero}")
+#     extrai_fin(numero)
+
+#     # if dados_dos_chamados:
+#     #     registrar_chamado(
+#     #         dados_dos_chamados,
+#     #         atividade=atividadehabilitada[idx],
+#     #         descricao=objetos_compra[idx],
+#     #         identificador=str(numero),
+#     #         hoje=hoje,
+#     #         remover_manual=False
+#     #     )
+
+# print("✅ Encerrada a extração dos FIN.")
+
+
+
+
+
 
 
 print("Finalizando.....")
