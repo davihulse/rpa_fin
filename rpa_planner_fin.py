@@ -441,7 +441,41 @@ def extrai_fin(numfin):
         print("❌ Frame não carregou. Pulando chamado.")
         return None
 
+    tipo_documento_map = {
+    "cd5234b365d0e0be2f9f0f35675e4ad7": "Adiantamento de Mídias Sociais - Facebook",
+    "89806d075fdecb2a7f5ef09b419f49cf": "AL (Aviso de lançamento)",
+    "fbcd6551dabee395975520eac85d26ce": "Aluguel",
+    "aff075fad54d65227c6f4d11a3594675": "Conhecimento de transporte",
+    "8e20bb220b9b6682c00c3e6f90ad6d95": "Faturas (Energia/Água/Internet/Telefonia)",
+    "b21bb8d92ca5c9d55bc72fcc4eb38263": "Insumos de Alimentação e Farmácia",
+    "a8cf7668aab4f099f2c840e689008368": "Licenciamento/DPVAT",
+    "39a7ac201ee522c9d13821ddfe7ce445": "Mídias Sociais - Facebook",
+    "2f9be0442387599aadd5e99acc6c738d": "NF Comunicação",
+    "4e67ce2c5f6e2356def6de66ff09fc56": "NF Serviço - Entre Casas (SESI/SENAI)",
+    "c259d830eee9864f1d5492f937aceb42": "Notas de Débito - Entre Casas",
+    "35823390368b62a8b9aee21a25ee1eca": "Pagamentos Rejeitados",
+    "b6e50aa9f31672ed0f62d37f91ad8207": "Produto",
+    "55b1fe3b58b61c2c46ebcc7b37fcc502": "Reembolso/Ressarcimento",
+    "0de84361ee0aa6c3f785370c00ead580": "Serviço",
+    "b7d11f1bff8a92db84b81adea62d6ca9": "Taxas"
+    }
+    
+    #Preencher as demais especificações
+    especificacao_map = {
+    "683772e630d835dbc855afe622b9ec35": "Produto",    
+    "9fd571ca945c53601f45ce940e69bcc4": "Taxas"
+    }
 
+    adiantamento_map = {
+    "308a83de517f730f3de47ae53c296af9": "Não",
+    "2e6296ec66975b8b87e0d94a73a5f391": "Sim"
+    }
+
+    tipo_compra_map = {
+    "677e3c3209b3c0cc63670b3b3333546f": "Chave de compra (Sem Ordem de Compra)",
+    "3c6575bae11225e7378448ea26b5f455": "Com Contrato de Compra",
+    "45b792a9ff6c51b8aa198243848dcf15": "Com ordem de compra"
+    }
         
     #Campos a extrair
     campos = [
@@ -473,7 +507,23 @@ def extrai_fin(numfin):
         dados_dos_chamados[nome] = element.get_attribute("value")
     
     dados_dos_chamados["Descrição"] = titulo_completo
-                 
+    
+    # Campos que precisam de Mapeamento (Início)
+    
+    cod_tipo_documento = dados_dos_chamados.get("Tipo de Documento")
+    dados_dos_chamados["Tipo de Documento"] = tipo_documento_map.get(cod_tipo_documento, cod_tipo_documento)
+    
+    cod_especificacao = dados_dos_chamados.get("Especificação")
+    dados_dos_chamados["Especificação"] = especificacao_map.get(cod_especificacao, cod_especificacao)
+    
+    cod_adiantamento = dados_dos_chamados.get("Valor pago por Adiantamento?")
+    dados_dos_chamados["Valor pago por Adiantamento?"] = adiantamento_map.get(cod_adiantamento, cod_adiantamento)
+    
+    cod_tipo_compra = dados_dos_chamados.get("Tipo de Compra")
+    dados_dos_chamados["Tipo de Compra"] = tipo_compra_map.get(cod_tipo_compra, cod_tipo_compra)
+
+    # /Campos que precisam de Mapeamento (Fim)
+             
     for janela in driver.window_handles:
         if janela != janela_principal:
             driver.switch_to.window(janela)
