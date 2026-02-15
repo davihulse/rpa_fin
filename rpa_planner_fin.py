@@ -458,7 +458,8 @@ def extrai_fin(numfin):
     #Preencher as demais especificações
     especificacao_map = {
     "683772e630d835dbc855afe622b9ec35": "Produto",    
-    "9fd571ca945c53601f45ce940e69bcc4": "Taxas"
+    "9fd571ca945c53601f45ce940e69bcc4": "Taxas",
+    "d7c5f59fec1d99fed96b0769fc2427bb": "Serviço"
     }
 
     adiantamento_map = {
@@ -484,6 +485,8 @@ def extrai_fin(numfin):
         ("Número do documento", '//*[@id="field_8a3449077918207d017980762ad719ba"]'),
         ("Tipo de Compra", '//*[@id="oidzoom_8a3449076f9f6db301701a5907032a88"]'),
         ("Ordem de compra (FIN)", '//*[@id="field_8a3449076f9f6db301701adda4b73de1"]'),
+        ("Contrato (FIN)", '//*[@id="field_8a3449076f9f6db301701adcaaf43da7"]'),
+        ("Registro Gerado (Apontamento)", '//*[@id="field_8a34490770c96a380170cfe7a19969c2"]'),
         ("RNs", '//*[@id="field_8a3449076f9f6db3016fe7454ab71792"]'),
         ("Observações", '//*[@id="field_8a344907739c40c10174300c129a4832"]'),
         ("Número AP", '//*[@id="field_8a3449076f9f6db3016fe735db491529"]'),
@@ -546,35 +549,15 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
 
     colunas_esperadas = [
         # --- Dados da Aquisição ---
-        "Código Unidade",
-        "Identificador",
-        "Apelido Projeto",
-        "Descrição",
-        "Fonte",
-        "Rubrica",
-        "Valor Aquisição R$",
-        "Ordem de Compra (Aquisição)",
+        "Código Unidade", "Identificador", "Apelido Projeto", "Descrição", "Fonte",
+        "Rubrica", "Valor Aquisição R$", "Ordem de Compra (Aquisição)",
         # --- Dados do FIN ---
-        "Número do FIN",
-        "Descrição FIN",
-        "Status FIN",
-        "Data da Abertura do FIN",
-        "Tipo de Documento",
-        "Especificação",
-        "Valor pago por Adiantamento?",
-        "Filial Faturada",
-        "CNPJ Fornecedor",
-        "Número do documento",
-        "Tipo de Compra",
-        "Ordem de compra (FIN)",
-        "RNs",
-        "Observações",
-        "Número AP",
-        "Data Agendada para Pagamento",
-        "Competência",
-        "Valor Bruto a Pagar (R$)",
-        "Valor a deduzir (R$)",
-        "Valor Líquido a Pagar (R$)",
+        "Número do FIN", "Descrição FIN", "Status FIN", "Data da Abertura do FIN",
+        "Tipo de Documento", "Especificação", "Valor pago por Adiantamento?",
+        "Filial Faturada", "CNPJ Fornecedor", "Número do documento", "Tipo de Compra",
+        "Ordem de compra (FIN)", "Contrato (FIN)", "Registro Gerado (Apontamento)",
+        "RNs", "Observações", "Número AP", "Data Agendada para Pagamento", "Competência",
+        "Valor Bruto a Pagar (R$)", "Valor a deduzir (R$)", "Valor Líquido a Pagar (R$)",
         "Nr. do documento (CAP)"
     ]
 
@@ -607,6 +590,8 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
         "Número do documento": dados_fin.get("Número do documento", ""),
         "Tipo de Compra": dados_fin.get("Tipo de Compra", ""),
         "Ordem de compra (FIN)": dados_fin.get("Ordem de compra (FIN)", ""),
+        "Contrato (FIN)": dados_fin.get("Contrato (FIN)", ""),
+        "Registro Gerado (Apontamento)": dados_fin.get("Registro Gerado (Apontamento)", ""), 
         "RNs": dados_fin.get("RNs", ""),
         "Observações": dados_fin.get("Observações", ""),
         "Número AP": dados_fin.get("Número AP", ""),
