@@ -205,10 +205,10 @@ def consolidar_planilhas(pasta_downloads):
 gc = gspread.service_account(filename=os.path.join(os.path.dirname(os.getcwd()), 'crested-century-386316-01c90985d6e4.json'))
 
 #Dados Aquisições RPA
-spreadsheet = gc.open("Acompanhamento_Aquisições_RPA")
-worksheet = spreadsheet.worksheet("Dados")
+spreadsheet_rpa = gc.open("Acompanhamento_Aquisições_RPA")
+worksheet_rpa = spreadsheet_rpa.worksheet("Dados")
 
-dados_rpa = worksheet.get_all_values()
+dados_rpa = worksheet_rpa.get_all_values()
 df_dados_rpa = pd.DataFrame(dados_rpa[1:], columns=dados_rpa[0])
 df_dados_rpa['Valor R$'] = df_dados_rpa['Valor R$'].str.replace('.', '', regex=False)
 
@@ -216,17 +216,10 @@ df_dados_rpa['Valor R$'] = df_dados_rpa['Valor R$'].str.replace('.', '', regex=F
 #df_dados_rpa["Valor R$"] = df_dados_rpa["Valor R$"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False).astype(float)
 #df_dados_rpa["Valor R$"] = df_dados_rpa["Valor R$"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False).astype(float)
 
-
-
-
-
-
-#Dados Aquisições RPA - planilha destino
+#Dados FIN RPA - planilha destino
 spreadsheet_fin = gc.open("Acompanhamento_FIN_RPA")
-worksheet_fins = spreadsheet_fin.worksheet("Dados")
+worksheet_fin = spreadsheet_fin.worksheet("Dados")
 
-
-    
 planners_urls = [
     "https://planner.cloud.microsoft/webui/plan/QXrbRoU7UEGdjE_bhw-QY2QAFn9X/view/board?tid=2cf7d4d5-bd1b-4956-acf8-2995399b2168",
     "https://planner.cloud.microsoft/webui/plan/vIOkh-y5EEuwwAlkWsRQRmQAER1C/view/board?tid=2cf7d4d5-bd1b-4956-acf8-2995399b2168",
@@ -235,6 +228,8 @@ planners_urls = [
 
 pasta_downloads = r"C:\RPA\rpa_fin\Downloads"
 driver = criar_driver(pasta_downloads)
+
+#Comentar as 3 linhas abaixo para pular o Download dos Planners em Excel
 #driver.get("https://planner.cloud.microsoft/webui/plan/QXrbRoU7UEGdjE_bhw-QY2QAFn9X/view/board?tid=2cf7d4d5-bd1b-4956-acf8-2995399b2168")
 #login_microsoft(driver)
 #exportar_planners(driver)
@@ -288,7 +283,7 @@ df["FIN"] = df["Itens da lista de verificação"].apply(extrair_fin)
 # df = df[colunas]
 
 
-#df.to_excel("df.xlsx", index=False)
+df.to_excel("df.xlsx", index=False)
 
 def login_sesuite():
     
@@ -357,7 +352,7 @@ def extrai_fin(numfin):
     print("Aguardando SE Suite...")
         
     try:
-        primeiro_item = WebDriverWait(driver, 200).until(
+        primeiro_item = WebDriverWait(driver, 20).until(
             EC.element_to_be_clickable((By.XPATH, '//*[@id="st-container"]/div/div/div/div[4]/div/div[2]/div/div/div[2]/div/div[2]/div[1]/span'))
         )
         print("FIN localizado. Extraindo dados...")
@@ -484,7 +479,7 @@ def extrai_fin(numfin):
         ("Tipo de Documento", '//*[@id="oidzoom_8a34490772df4a7a0172eb5952b56c38"]'),
         ("Especificação", '//*[@id="oidzoom_8a3449077843843601785b0a8d400c5c"]'),
         ("Valor pago por Adiantamento?", '//*[@id="oidzoom_8a34490770c96a380170cfe876536a31"]'),
-        ("Filial Faturada", '//*[@id="nmwebservice_1951471w1w212"]'),
+        ("Filial Faturada", '//*[@id="field_8a3449076f9f6db3016fe80ac15f31aa"]'),
         ("CNPJ Fornecedor", '//*[@id="field_8a3449076f9f6db3016fe747b2fe17cf"]'),
         ("Número do documento", '//*[@id="field_8a3449077918207d017980762ad719ba"]'),
         ("Tipo de Compra", '//*[@id="oidzoom_8a3449076f9f6db301701a5907032a88"]'),
@@ -501,10 +496,14 @@ def extrai_fin(numfin):
     ]
                
     for nome, xpath in campos:
-        element = WebDriverWait(driver, 100).until(
-            EC.presence_of_element_located((By.XPATH, xpath))
-        )
-        dados_dos_chamados[nome] = element.get_attribute("value")
+        try:
+            element = WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.XPATH, xpath))
+            )
+            dados_dos_chamados[nome] = element.get_attribute("value")
+        except TimeoutException:
+            print(f"⚠️ Campo '{nome}' não encontrado. Registrando como vazio.")
+            dados_dos_chamados[nome] = ""
     
     dados_dos_chamados["Descrição"] = titulo_completo
     
@@ -543,7 +542,7 @@ def extrai_fin(numfin):
     return dados_dos_chamados
 
 
-def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fins):
+def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
 
     colunas_esperadas = [
         # --- Dados da Aquisição ---
@@ -622,7 +621,7 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fins):
     linha_ordenada = [linha.get(col, "") for col in colunas_esperadas]
 
     # Leitura existente
-    valores_existentes = worksheet_fins.get_all_records()
+    valores_existentes = worksheet_fin.get_all_records()
     df_existente = pd.DataFrame(valores_existentes)
 
     if not df_existente.empty and "Número do FIN" in df_existente.columns:
@@ -631,18 +630,153 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fins):
         fins_existentes = []
 
     numero_fin = str(linha["Número do FIN"])
+    identificador = linha.get("Identificador", "")
+
+    # Tentativa de colocar o saldo no final das linhas do chamado (não deu certo):
+    #       
+    # if numero_fin in fins_existentes:
+    #     idx = fins_existentes.index(numero_fin)
+    #     linha_planilha = idx + 2  # header + base 1
+    #     worksheet_fin.update(
+    #         values=[linha_ordenada],
+    #         range_name=f"A{linha_planilha}"
+    #     )
+    #     print(f"🔁 FIN {numero_fin} atualizado na linha {linha_planilha}.")
+    # else:
+    #     # Verifica se já existe linha de Saldo para o mesmo identificador
+    #     if not df_existente.empty and "Número do FIN" in df_existente.columns:
+    #         idx_saldo_insert = df_existente[
+    #             (df_existente["Identificador"] == identificador)
+    #             & (df_existente["Número do FIN"] == "Saldo")
+    #         ].index
+
+    #         if len(idx_saldo_insert) > 0:
+    #             # Insere ACIMA da linha de Saldo, empurrando ela para baixo
+    #             linha_inserir = idx_saldo_insert[0] + 2  # header + base 1
+    #             worksheet_fin.insert_rows([linha_ordenada], row=linha_inserir)
+    #             print(f"➕ FIN {numero_fin} inserido na linha {linha_inserir}, acima do Saldo.")
+    #         else:
+    #             worksheet_fin.append_row(linha_ordenada)
+    #             print(f"➕ FIN {numero_fin} inserido como nova linha.")
+    #     else:
+    #         worksheet_fin.append_row(linha_ordenada)
+    #         print(f"➕ FIN {numero_fin} inserido como nova linha.")
 
     if numero_fin in fins_existentes:
         idx = fins_existentes.index(numero_fin)
         linha_planilha = idx + 2  # header + base 1
-        worksheet_fins.update(
+        worksheet_fin.update(
             values=[linha_ordenada],
-            range_name=f"A{linha_planilha}"
+            range_name=f"A{linha_planilha}",
+            value_input_option="USER_ENTERED"
         )
         print(f"🔁 FIN {numero_fin} atualizado na linha {linha_planilha}.")
     else:
-        worksheet_fins.append_row(linha_ordenada)
+        worksheet_fin.append_row(linha_ordenada, value_input_option="USER_ENTERED")
         print(f"➕ FIN {numero_fin} inserido como nova linha.")
+    
+    # (Re)carrega planilha com cabeçalhos
+    # valores_existentes = worksheet_fin.get_all_values()
+    # df_existente = pd.DataFrame(valores_existentes[1:], columns=valores_existentes[0])
+
+
+    # (Re)carrega planilha com cabeçalhos
+    valores_existentes = worksheet_fin.get_all_values()
+    df_existente = pd.DataFrame(valores_existentes[1:], columns=valores_existentes[0])
+
+    # Tentativa de colocar o saldo no final das linhas do chamado (não deu certo):
+    # Reordena: garante que Saldo fique sempre após todos os FINs do mesmo identificador
+    # if identificador and not df_existente.empty and "Número do FIN" in df_existente.columns:
+    #     idx_saldo_reorder = df_existente[
+    #         (df_existente["Identificador"] == identificador)
+    #         & (df_existente["Número do FIN"] == "Saldo")
+    #     ].index
+
+    #     idx_fins_reorder = df_existente[
+    #         (df_existente["Identificador"] == identificador)
+    #         & (df_existente["Número do FIN"] != "Saldo")
+    #     ].index
+
+    #     if len(idx_saldo_reorder) > 0 and len(idx_fins_reorder) > 0:
+    #         ultimo_fin = idx_fins_reorder[-1]
+    #         linha_saldo_atual = idx_saldo_reorder[0]
+
+    #         if linha_saldo_atual < ultimo_fin:
+    #             # Saldo está antes de algum FIN: move para depois do último FIN
+    #             conteudo_saldo = [str(v) if not isinstance(v, str) else v for v in df_existente.loc[linha_saldo_atual].tolist()]
+    #             worksheet_fin.delete_rows(linha_saldo_atual + 2)
+    #             # Após deletar, o último FIN recua uma linha se estava abaixo do saldo
+    #             row_destino = ultimo_fin + 2 if ultimo_fin < linha_saldo_atual else ultimo_fin + 1
+    #             worksheet_fin.insert_rows([conteudo_saldo], row=row_destino)
+                
+    #             print(f"🔀 Linha Saldo reposicionada após o último FIN do identificador {identificador}.")
+
+    #             # Recarrega após reposicionamento
+    #             valores_existentes = worksheet_fin.get_all_values()
+    #             df_existente = pd.DataFrame(valores_existentes[1:], columns=valores_existentes[0])
+
+
+        
+    
+    # Verifica e atualiza linha de saldo
+
+    if identificador:
+        registros_mesmo_chamado = df_existente[
+            (df_existente["Identificador"] == identificador)
+            & (df_existente["Número do FIN"] != "Saldo")
+        ]
+    
+        #soma_fins = registros_mesmo_chamado["Valor Líquido a Pagar (R$)"].astype(str).str.replace(".", "").str.replace(",", ".").astype(float).sum()
+
+        soma_fins = (
+                    registros_mesmo_chamado["Valor Líquido a Pagar (R$)"]
+                    .astype(str)
+                    .str.strip()
+                    .str.replace(r"\.", "", regex=True)
+                    .str.replace(",", ".", regex=False)
+                    .pipe(pd.to_numeric, errors="coerce")
+                    .fillna(0)
+                    .sum()
+                )
+
+        valor_oc = dados_aquisicao.get("Valor R$", "")
+        try:
+            valor_oc_float = float(str(valor_oc).replace(".", "").replace(",", "."))
+        except:
+            valor_oc_float = 0.0
+    
+        saldo = valor_oc_float - soma_fins
+    
+        idx_saldo = df_existente[
+            (df_existente["Identificador"] == identificador)
+            & (df_existente["Número do FIN"] == "Saldo")
+        ].index
+    
+        if saldo != 0:
+            linha_saldo = {col: "" for col in colunas_esperadas}
+            linha_saldo["Código Unidade"] = linha.get("Código Unidade", "")
+            linha_saldo["Identificador"] = identificador
+            linha_saldo["Apelido Projeto"] = linha.get("Apelido Projeto", "")
+            linha_saldo["Descrição"] = linha.get("Descrição", "")
+            linha_saldo["Fonte"] = linha.get("Fonte", "")
+            linha_saldo["Rubrica"] = linha.get("Rubrica", "")
+            linha_saldo["Valor Aquisição R$"] = linha.get("Valor Aquisição R$", "")
+            linha_saldo["Número do FIN"] = "Saldo"
+            linha_saldo["Valor Bruto a Pagar (R$)"] = f"{saldo:,.2f}".replace(".", "X").replace(",", ".").replace("X", ",")           
+            # linha_saldo = linha.copy()
+            # linha_saldo["Número do FIN"] = "Saldo"
+            # linha_saldo["Valor Líquido a Pagar (R$)"] = f"{saldo:,.2f}".replace(".", "X").replace(",", ".").replace("X", ",")
+    
+            if len(idx_saldo) > 0:
+                worksheet_fin.update(values=[[linha_saldo[col] for col in df_existente.columns]],
+                                     range_name=f"A{idx_saldo[0]+2}", value_input_option="USER_ENTERED")
+                #worksheet_fin.update(f"A{idx_saldo[0]+2}", [linha_saldo[col] for col in df_existente.columns])
+            else:
+                worksheet_fin.insert_rows([[linha_saldo.get(col, "") for col in df_existente.columns]],
+                                          row=len(df_existente)+2, value_input_option="USER_ENTERED")
+    
+        elif len(idx_saldo) > 0:
+            worksheet_fin.delete_rows(idx_saldo[0] + 2)
 
 ############Teste com dois FIN's
 
@@ -671,7 +805,7 @@ login_sesuite()
 
 #     dados_aquisicao = linha_aquisicao.iloc[0].to_dict()
 
-#     registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fins)
+#     registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin)
 
 # print("✅ Teste de extração de dois FINs concluído.")
 ########################## Fim do teste
@@ -681,15 +815,25 @@ login_sesuite()
 #df["Numero Tarefa"] = df["Numero Tarefa"].astype(str).str.zfill(6)
 #df_dados_rpa["Numero Tarefa"] = df_dados_rpa["Numero Tarefa"].astype(str).str.zfill(6)
 
-# Lista de FINs para testar
-lista_fin_teste = ["FIN.778678/26", "FIN.764097/25", "FIN.742971/25", "FIN.742985/25", "FIN.742975/25"]
+
+# Lista de FINs para testar (todos do chamado 184437)
+lista_fin_teste = ["FIN.644984/25", "FIN.549393/24", "FIN.592968/24", "FIN.605532/24",
+                   "FIN.626942/25", "FIN.626943/25"
+]
+
+# # Lista de FINs para testar
+# lista_fin_teste = ["FIN.778678/26", "FIN.764097/25", "FIN.742971/25", "FIN.742985/25",
+#                    "FIN.742975/25", "FIN.644984/25", "FIN.549393/24"
+# ]
+
+
 
 for idx, fin in enumerate(lista_fin_teste):
-    print(f"[{idx+1}/{len(lista_fin_teste)}] Acessando FIN {fin}")
+    print(f"[{idx+1}/{len(lista_fin_teste)}] Acessando {fin}")
     
     dados_fin = extrai_fin(fin)
     if not dados_fin:
-        print(f"❌ Falha ao extrair dados do FIN {fin}.")
+        print(f"❌ Falha ao extrair dados do {fin}.")
         continue
 
     # Busca a linha do df que contém o FIN
@@ -709,7 +853,7 @@ for idx, fin in enumerate(lista_fin_teste):
 
     dados_aquisicao = linha_aquisicao.iloc[0].to_dict()
 
-    registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fins)
+    registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin)
 
 
 ######### /teste 2
