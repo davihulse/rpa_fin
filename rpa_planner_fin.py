@@ -16,7 +16,7 @@ from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.keys import Keys
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, UnexpectedAlertPresentException
 #from datetime import datetime
 import os
 #import ctypes
@@ -219,6 +219,8 @@ df_dados_rpa['Valor R$'] = df_dados_rpa['Valor R$'].str.replace('.', '', regex=F
 #Dados FIN RPA - planilha destino
 spreadsheet_fin = gc.open("Acompanhamento_FIN_RPA")
 worksheet_fin = spreadsheet_fin.worksheet("Dados")
+worksheet_manuais = spreadsheet_fin.worksheet("Manuais")
+
 
 planners_urls = [
     "https://planner.cloud.microsoft/webui/plan/QXrbRoU7UEGdjE_bhw-QY2QAFn9X/view/board?tid=2cf7d4d5-bd1b-4956-acf8-2995399b2168",
@@ -230,9 +232,9 @@ pasta_downloads = r"C:\RPA\rpa_fin\Downloads"
 driver = criar_driver(pasta_downloads)
 
 #Comentar as 3 linhas abaixo para pular o Download dos Planners em Excel
-#driver.get("https://planner.cloud.microsoft/webui/plan/QXrbRoU7UEGdjE_bhw-QY2QAFn9X/view/board?tid=2cf7d4d5-bd1b-4956-acf8-2995399b2168")
-#login_microsoft(driver)
-#exportar_planners(driver)
+driver.get("https://planner.cloud.microsoft/webui/plan/QXrbRoU7UEGdjE_bhw-QY2QAFn9X/view/board?tid=2cf7d4d5-bd1b-4956-acf8-2995399b2168")
+login_microsoft(driver)
+exportar_planners(driver)
 
 df = consolidar_planilhas(pasta_downloads)
 
@@ -282,7 +284,7 @@ df["FIN"] = df["Itens da lista de verificação"].apply(extrair_fin)
 # colunas.insert(idx + 1, "Numero Tarefa")
 # df = df[colunas]
 
-
+# Exportar DF para Excel:
 df.to_excel("df.xlsx", index=False)
 
 def login_sesuite():
@@ -307,11 +309,26 @@ def login_sesuite():
 
 
 def extrai_fin(numfin):
+    # sleep(1)
+    
+    # driver.get(r'https://sesuite.fiesc.com.br/softexpert/workspace?page=home')
+    
+    # janela_principal = driver.window_handles[0]
+    
+    
     sleep(1)
     
-    driver.get(r'https://sesuite.fiesc.com.br/softexpert/workspace?page=home')
-    
+    try:
+        driver.get(r'https://sesuite.fiesc.com.br/softexpert/workspace?page=home')
+    except UnexpectedAlertPresentException:
+        try:
+            driver.switch_to.alert.accept()
+        except:
+            pass
+
     janela_principal = driver.window_handles[0]
+    
+    
  
     xpaths_input = [
         '//*[@id="st-container"]/div/div/div/div[1]/ul[3]/div/div/div[1]/input',
@@ -459,7 +476,8 @@ def extrai_fin(numfin):
     especificacao_map = {
     "683772e630d835dbc855afe622b9ec35": "Produto",    
     "9fd571ca945c53601f45ce940e69bcc4": "Taxas",
-    "d7c5f59fec1d99fed96b0769fc2427bb": "Serviço"
+    "d7c5f59fec1d99fed96b0769fc2427bb": "Serviço",
+    "d2fe1c2a4a00ab7cad978ae2fa913bac": "Conhecimento de transporte"
     }
 
     adiantamento_map = {
@@ -500,7 +518,7 @@ def extrai_fin(numfin):
                
     for nome, xpath in campos:
         try:
-            element = WebDriverWait(driver, 15).until(
+            element = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.XPATH, xpath))
             )
             dados_dos_chamados[nome] = element.get_attribute("value")
@@ -535,10 +553,10 @@ def extrai_fin(numfin):
     
     dados_dos_chamados["Status"] = status_texto
     
-    print("Descrição: ", dados_dos_chamados["Descrição"])
-    print("Número do FIN: ", dados_dos_chamados["Número do FIN"])
-    print("Valor Líquido a Pagar (R$): ", dados_dos_chamados["Valor Líquido a Pagar (R$)"])
-    print("Status: ", dados_dos_chamados["Status"])
+    #print("Descrição: ", dados_dos_chamados["Descrição"])
+    #print("Número do FIN: ", dados_dos_chamados["Número do FIN"])
+    #print("Valor Líquido a Pagar (R$): ", dados_dos_chamados["Valor Líquido a Pagar (R$)"])
+    #print("Status: ", dados_dos_chamados["Status"])
 
     print("Dados do ", numfin, " extraídos.")
     
@@ -761,7 +779,7 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
                                           row=len(df_existente)+2, value_input_option="USER_ENTERED")
     
         elif len(idx_saldo) > 0:
-            worksheet_fin.delete_rows(idx_saldo[0] + 2)
+            worksheet_fin.delete_rows(int(idx_saldo[0]) + 2)
 
 ############Teste com dois FIN's
 
@@ -811,27 +829,90 @@ lista_fin_teste = ["FIN.644984/25", "FIN.549393/24", "FIN.592968/24", "FIN.60553
 #                    "FIN.742975/25", "FIN.644984/25", "FIN.549393/24"
 # ]
 
+# lista_fins = df[df["FIN"].notna()]["FIN"].unique().tolist()
 
+# fins_em_dados = worksheet_fin.col_values(
+#     worksheet_fin.row_values(1).index("Número do FIN") + 1
+# )
 
-for idx, fin in enumerate(lista_fin_teste):
-    print(f"[{idx+1}/{len(lista_fin_teste)}] Acessando {fin}")
-    
+# fins_em_manuais = [v.strip() for v in worksheet_manuais.col_values(1) if v.strip()]
+# # fins_em_manuais = worksheet_manuais.col_values(
+# #     worksheet_manuais.row_values(1).index("Número do FIN") + 1
+# # )
+
+# for idx, fin in enumerate(lista_fins):
+#     print(f"[{idx+1}/{len(lista_fins)}] Processando {fin}")
+
+#     if fin in fins_em_dados:
+#         print(f"⏭️ {fin} já existe em Dados. Pulando.")
+#         continue
+
+fins_em_dados = worksheet_fin.col_values(
+    worksheet_fin.row_values(1).index("Número do FIN") + 1
+)
+fins_em_manuais = [v.strip() for v in worksheet_manuais.col_values(1) if v.strip()]
+
+# --- Primeiro: manuais ---
+print("📌 Iniciando extração de FINs manuais...")
+for idx, fin in enumerate(fins_em_manuais):
+    print(f"[MANUAL {idx+1}/{len(fins_em_manuais)}] Processando {fin}")
+
+    dados_fin = extrai_fin(fin)
+    if not dados_fin:
+        print(f"⚠️ {fin} não pôde ser extraído. Mantendo na lista manual.")
+        continue
+
+    linha_com_fin = df[df["FIN"] == fin]
+    if linha_com_fin.empty:
+        print(f"⚠️ {fin} não encontrado na planilha consolidada. Pulando.")
+        continue
+
+    numero_tarefa = linha_com_fin.iloc[0]["Numero Tarefa"]
+    linha_aquisicao = df_dados_rpa[
+        df_dados_rpa["Identificador"].astype(str).str.zfill(6) == str(numero_tarefa).zfill(6)
+    ]
+    if linha_aquisicao.empty:
+        print(f"⚠️ Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}. Pulando.")
+        continue
+
+    dados_aquisicao = linha_aquisicao.iloc[0].to_dict()
+    registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin)
+
+    todas_linhas = worksheet_manuais.col_values(1)
+    for i, valor in enumerate(todas_linhas):
+        if valor.strip() == fin:
+            worksheet_manuais.delete_rows(i + 1)
+            print(f"🗑️ {fin} removido da aba Manuais.")
+            break
+
+print("✅ Encerrada a extração de FINs manuais. Continuando para os demais...")
+
+# --- Depois: df ---
+print("📌 Iniciando extração dos FINs do Planner...")
+lista_fins = df[df["FIN"].notna()]["FIN"].unique().tolist()
+
+for idx, fin in enumerate(lista_fins):
+    print(f"[{idx+1}/{len(lista_fins)}] Processando {fin}")
+
+    if fin in fins_em_dados:
+        print(f"⏭️ {fin} já existe em Dados. Pulando.")
+        continue
+
     dados_fin = extrai_fin(fin)
     if not dados_fin:
         print(f"❌ Falha ao extrair dados do {fin}.")
         continue
 
-    # Busca a linha do df que contém o FIN
     linha_com_fin = df[df["FIN"] == fin]
     if linha_com_fin.empty:
-        print(f"⚠️ FIN {fin} não encontrado na planilha consolidada. Pulando.")
+        print(f"⚠️ {fin} não encontrado na planilha consolidada. Pulando.")
         continue
 
     numero_tarefa = linha_com_fin.iloc[0]["Numero Tarefa"]
 
-    # Agora busca os dados da aquisição pelo Numero Tarefa
-    linha_aquisicao = df_dados_rpa[df_dados_rpa["Identificador"].astype(str).str.zfill(6) == str(numero_tarefa).zfill(6)]
-
+    linha_aquisicao = df_dados_rpa[
+        df_dados_rpa["Identificador"].astype(str).str.zfill(6) == str(numero_tarefa).zfill(6)
+    ]
     if linha_aquisicao.empty:
         print(f"⚠️ Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}. Pulando.")
         continue
@@ -840,6 +921,49 @@ for idx, fin in enumerate(lista_fin_teste):
 
     registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin)
 
+    # Se estava em Manuais, remove de lá após inserir com sucesso em Dados
+    if fin in fins_em_manuais:
+        todas_linhas = worksheet_manuais.col_values(1)
+        for i, valor in enumerate(todas_linhas):
+            if valor.strip() == fin:
+                worksheet_manuais.delete_rows(i + 1)
+                print(f"🗑️ {fin} removido da aba Manuais.")
+                break
+    
+    # if fin in fins_em_manuais:
+    #     idx_manual = fins_em_manuais.index(fin)
+    #     worksheet_manuais.delete_rows(idx_manual + 1)
+    #     print(f"🗑️ {fin} removido da aba Manuais.")
+        
+        
+# #################### 15/02 14:48
+# for idx, fin in enumerate(lista_fin_teste):
+#     print(f"[{idx+1}/{len(lista_fin_teste)}] Acessando {fin}")
+    
+#     dados_fin = extrai_fin(fin)
+#     if not dados_fin:
+#         print(f"❌ Falha ao extrair dados do {fin}.")
+#         continue
+
+#     # Busca a linha do df que contém o FIN
+#     linha_com_fin = df[df["FIN"] == fin]
+#     if linha_com_fin.empty:
+#         print(f"⚠️ FIN {fin} não encontrado na planilha consolidada. Pulando.")
+#         continue
+
+#     numero_tarefa = linha_com_fin.iloc[0]["Numero Tarefa"]
+
+#     # Agora busca os dados da aquisição pelo Numero Tarefa
+#     linha_aquisicao = df_dados_rpa[df_dados_rpa["Identificador"].astype(str).str.zfill(6) == str(numero_tarefa).zfill(6)]
+
+#     if linha_aquisicao.empty:
+#         print(f"⚠️ Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}. Pulando.")
+#         continue
+
+#     dados_aquisicao = linha_aquisicao.iloc[0].to_dict()
+
+#     registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin)
+# #################### / 15/02 14:48
 
 ######### /teste 2
 
