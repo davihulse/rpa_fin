@@ -52,14 +52,21 @@ def login_microsoft(driver):
 
     print("Realizando Login...")
 
-    WebDriverWait(driver, 15).until(
-        EC.presence_of_element_located((By.ID, "i0116"))
-    ).send_keys('davi.hulse@sc.senai.br' + Keys.ENTER)
+    # WebDriverWait(driver, 20).until(
+    #     EC.presence_of_element_located((By.ID, "i0116"))
+    # ).send_keys('davi.hulse@sc.senai.br' + Keys.ENTER)
+    
+    try:
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.ID, "i0116"))
+        ).send_keys('davi.hulse@sc.senai.br' + Keys.ENTER)
+    except TimeoutException:
+        print("✅ Login já autenticado. Pulando etapa de usuário.")
 
     # Etapa 2 – Senha com loop de tentativa
-    for tentativa in range(5):
+    for tentativa in range(3):
         try:
-            WebDriverWait(driver, 10).until(
+            WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located((By.ID, "i0118"))
             )
             password_input = driver.find_element(By.ID, "i0118")
@@ -71,7 +78,7 @@ def login_microsoft(driver):
             botao_entrar.click()
             break
         except Exception:
-            print(f"⏳ Tentativa {tentativa+1}/5 falhou ao localizar campo de senha. Retentando...")
+            print(f"⏳ Tentativa {tentativa+1}/3 falhou ao localizar campo de senha. Retentando...")
             sleep(1)
     else:
         print("❌ Não foi possível enviar a senha após múltiplas tentativas.")
@@ -198,6 +205,63 @@ def consolidar_planilhas(pasta_downloads):
     print(f"✅ Consolidação concluída: {df_final.shape[0]} linhas totais, {df_final.shape[1]} colunas distintas")
     return df_final
 
+
+# def registrar_alerta(fin, identificador, mensagem):
+#     valores = worksheet_alertas.get_all_values()
+#     cabecalho = ["Número do FIN", "Identificador", "Mensagem", "Data"]
+
+#     if not valores:
+#         worksheet_alertas.append_row(cabecalho, value_input_option="USER_ENTERED")
+#         fins_alertas = []
+#     else:
+#         fins_alertas = [str(linha[0]).strip() for linha in valores[1:]]
+
+#     from datetime import datetime
+#     data_atual = datetime.now().strftime("%d/%m/%Y %H:%M")
+#     nova_linha = [fin, identificador, mensagem, data_atual]
+
+#     if fin in fins_alertas:
+#         idx = fins_alertas.index(fin)
+#         worksheet_alertas.update(
+#             values=[nova_linha],
+#             range_name=f"A{idx + 2}",
+#             value_input_option="USER_ENTERED"
+#         )
+#         print(f"🔁 Alerta do {fin} atualizado.")
+#     else:
+#         worksheet_alertas.append_row(nova_linha, value_input_option="USER_ENTERED")
+#         print(f"➕ Alerta do {fin} registrado.")
+
+def registrar_alerta(fin, identificador, mensagem, titulo_card=""):
+    valores = worksheet_alertas.get_all_values()
+    cabecalho = ["Número do FIN", "Título do Card", "Identificador", "Mensagem", "Data"]
+    #cabecalho = ["Número do FIN", "Identificador", "Título do Card", "Mensagem", "Data"]
+
+    if not valores:
+        worksheet_alertas.append_row(cabecalho, value_input_option="USER_ENTERED")
+        fins_alertas = []
+    else:
+        fins_alertas = [str(linha[0]).strip() for linha in valores[1:]]
+
+    from datetime import datetime
+    data_atual = datetime.now().strftime("%d/%m/%Y %H:%M")
+    #nova_linha = [fin, identificador, titulo_card, mensagem, data_atual]
+    nova_linha = [fin, titulo_card, identificador, mensagem, data_atual]
+
+    if fin in fins_alertas:
+        idx = fins_alertas.index(fin)
+        worksheet_alertas.update(
+            values=[nova_linha],
+            range_name=f"A{idx + 2}",
+            value_input_option="USER_ENTERED"
+        )
+        print(f"🔁 Alerta do {fin} atualizado.")
+    else:
+        worksheet_alertas.append_row(nova_linha, value_input_option="USER_ENTERED")
+        print(f"➕ Alerta do {fin} registrado.")
+
+
+
 #######################
 
 
@@ -207,19 +271,25 @@ gc = gspread.service_account(filename=os.path.join(os.path.dirname(os.getcwd()),
 #Dados Aquisições RPA
 spreadsheet_rpa = gc.open("Acompanhamento_Aquisições_RPA")
 worksheet_rpa = spreadsheet_rpa.worksheet("Dados")
-
 dados_rpa = worksheet_rpa.get_all_values()
+
+worksheet_rpa_eproc = spreadsheet_rpa.worksheet("EPROC")
+dados_rpa_eproc = worksheet_rpa_eproc.get_all_values()
+
 df_dados_rpa = pd.DataFrame(dados_rpa[1:], columns=dados_rpa[0])
+
+df_dados_rpa_eproc = pd.DataFrame(dados_rpa_eproc[1:], columns=dados_rpa_eproc[0])
+
+df_dados_rpa = pd.concat([df_dados_rpa, df_dados_rpa_eproc], ignore_index=True, sort=False)
 df_dados_rpa['Valor R$'] = df_dados_rpa['Valor R$'].str.replace('.', '', regex=False)
 
-#df_dados_rpa = pd.DataFrame(dados_rpa)
-#df_dados_rpa["Valor R$"] = df_dados_rpa["Valor R$"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False).astype(float)
-#df_dados_rpa["Valor R$"] = df_dados_rpa["Valor R$"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False).astype(float)
 
 #Dados FIN RPA - planilha destino
 spreadsheet_fin = gc.open("Acompanhamento_FIN_RPA")
 worksheet_fin = spreadsheet_fin.worksheet("Dados")
 worksheet_manuais = spreadsheet_fin.worksheet("Manuais")
+worksheet_ignorar = spreadsheet_fin.worksheet("Ignorar")
+worksheet_alertas = spreadsheet_fin.worksheet("Alertas")
 
 
 planners_urls = [
@@ -266,7 +336,20 @@ def extrair_numero_tarefa(texto):
 df["Numero Tarefa"] = df["Nome da tarefa"].apply(extrair_numero_tarefa)
 
 
-def extrair_fin(texto):
+def extrair_numero_documento_card(titulo_card):
+    """Extrai o número do documento do título do card (após 'NF nº:')"""
+    if pd.isna(titulo_card):
+        return None
+    match = re.search(r"NF nº:\s*([0-9\-/]+)", titulo_card, flags=re.IGNORECASE)
+    if match:
+        # Remove pontuação, mantém só números
+        return re.sub(r"[^0-9]", "", match.group(1))
+    return None
+
+
+
+
+def extrair_numero_fin(texto):
     if pd.isna(texto):
         return None
     match = re.search(r"FIN[:.\s\-]*?(\d{4,6}/\d{2})", texto, flags=re.IGNORECASE)
@@ -274,7 +357,7 @@ def extrair_fin(texto):
         return f"FIN.{match.group(1)}"
     return None
 
-df["FIN"] = df["Itens da lista de verificação"].apply(extrair_fin)
+df["FIN"] = df["Itens da lista de verificação"].apply(extrair_numero_fin)
 
 
 #### Bloco apenas para organizar colunas, pode ser removido depois:
@@ -285,7 +368,7 @@ df["FIN"] = df["Itens da lista de verificação"].apply(extrair_fin)
 # df = df[colunas]
 
 # Exportar DF para Excel:
-df.to_excel("df.xlsx", index=False)
+#df.to_excel("df.xlsx", index=False)
 
 def login_sesuite():
     
@@ -309,14 +392,7 @@ def login_sesuite():
 
 
 def extrai_fin(numfin):
-    # sleep(1)
-    
-    # driver.get(r'https://sesuite.fiesc.com.br/softexpert/workspace?page=home')
-    
-    # janela_principal = driver.window_handles[0]
-    
-    
-    sleep(1)
+    #sleep(1)
     
     try:
         driver.get(r'https://sesuite.fiesc.com.br/softexpert/workspace?page=home')
@@ -327,9 +403,7 @@ def extrai_fin(numfin):
             pass
 
     janela_principal = driver.window_handles[0]
-    
-    
- 
+     
     xpaths_input = [
         '//*[@id="st-container"]/div/div/div/div[1]/ul[3]/div/div/div[1]/input',
         '//*[@id="st-container"]/div/div[1]/div/div[1]/ul[3]/div/div/div[1]/input',
@@ -361,9 +435,9 @@ def extrai_fin(numfin):
     #         continue
     
     inserir_fin.clear()
-    sleep(1)
+    #sleep(1)
     inserir_fin.send_keys(str(numfin))
-    sleep(1)
+    #sleep(1)
     inserir_fin.send_keys(Keys.ENTER)
     
     print("Aguardando SE Suite...")
@@ -372,10 +446,17 @@ def extrai_fin(numfin):
         primeiro_item = WebDriverWait(driver, 20).until(
             EC.element_to_be_clickable((By.XPATH, '//*[@id="st-container"]/div/div/div/div[4]/div/div[2]/div/div/div[2]/div/div[2]/div[1]/span'))
         )
-        print("FIN localizado. Extraindo dados...")
+        print("FIN localizado.")
     except TimeoutException:
         print("❌ Nenhum FIN encontrado. Pulando.")
         return None
+
+    # Extrai o texto do link antes de clicar para validar DOC FISCAL
+    texto_link = primeiro_item.text.strip()
+    match_doc_fiscal = re.search(r"DOC FISCAL:\s*([0-9\-/]+)", texto_link, flags=re.IGNORECASE)
+    doc_fiscal_sesuite = re.sub(r"[^0-9]", "", match_doc_fiscal.group(1)) if match_doc_fiscal else None
+    print("Extraindo dados...")
+
         
     for tentativa in range(5):
         handles_antes = set(driver.window_handles)
@@ -553,6 +634,8 @@ def extrai_fin(numfin):
     
     dados_dos_chamados["Status"] = status_texto
     
+    dados_dos_chamados["_doc_fiscal_validacao"] = doc_fiscal_sesuite
+    
     #print("Descrição: ", dados_dos_chamados["Descrição"])
     #print("Número do FIN: ", dados_dos_chamados["Número do FIN"])
     #print("Valor Líquido a Pagar (R$): ", dados_dos_chamados["Valor Líquido a Pagar (R$)"])
@@ -566,6 +649,7 @@ def extrai_fin(numfin):
 def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
 
     colunas_esperadas = [
+        "ID_CARD",
         # --- Dados da Aquisição ---
         "Código Unidade", "Identificador", "Apelido Projeto", "Descrição", "Fonte",
         "Rubrica", "Valor Aquisição R$", "Ordem de Compra (Aquisição)",
@@ -586,6 +670,7 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
                 origem[k] = v.replace("\n", " ").strip()
 
     linha = {
+        "ID_CARD": dados_aquisicao.get("ID_CARD", ""),
         # --- Aquisição ---
         "Código Unidade": dados_aquisicao.get("Código Unidade", ""),
         "Identificador": dados_aquisicao.get("Identificador", ""),
@@ -627,11 +712,12 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
     valores_existentes = worksheet_fin.get_all_records()
     df_existente = pd.DataFrame(valores_existentes)
 
-    if not df_existente.empty and "Número do FIN" in df_existente.columns:
-        fins_existentes = df_existente["Número do FIN"].astype(str).tolist()
+    if not df_existente.empty and "ID_CARD" in df_existente.columns:
+        ids_existentes = df_existente["ID_CARD"].astype(str).tolist()
     else:
-        fins_existentes = []
+        ids_existentes = []
 
+    id_card = str(linha["ID_CARD"])
     numero_fin = str(linha["Número do FIN"])
     identificador = linha.get("Identificador", "")
 
@@ -665,18 +751,18 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
     #         worksheet_fin.append_row(linha_ordenada)
     #         print(f"➕ FIN {numero_fin} inserido como nova linha.")
 
-    if numero_fin in fins_existentes:
-        idx = fins_existentes.index(numero_fin)
+    if id_card in ids_existentes:
+        idx = ids_existentes.index(id_card)
         linha_planilha = idx + 2  # header + base 1
         worksheet_fin.update(
             values=[linha_ordenada],
             range_name=f"A{linha_planilha}",
             value_input_option="USER_ENTERED"
         )
-        print(f"🔁 FIN {numero_fin} atualizado na linha {linha_planilha}.")
+        print(f"🔁 Card {id_card} ({numero_fin}) atualizado na linha {linha_planilha}.")
     else:
         worksheet_fin.append_row(linha_ordenada, value_input_option="USER_ENTERED")
-        print(f"➕ FIN {numero_fin} inserido como nova linha.")
+        print(f"➕ Card {id_card} ({numero_fin}) inserido como nova linha.")
     
     # (Re)carrega planilha com cabeçalhos
     # valores_existentes = worksheet_fin.get_all_values()
@@ -749,6 +835,11 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
             valor_oc_float = 0.0
     
         saldo = valor_oc_float - soma_fins
+        if saldo < -9.99:
+            msg = f"Saldo negativo: {saldo:,.2f}. Verifique o cruzamento de dados."
+            print(f"⚠️ ATENÇÃO: {msg} Identificador: {identificador}.")
+            registrar_alerta(numero_fin, identificador, msg)
+            
     
         idx_saldo = df_existente[
             (df_existente["Identificador"] == identificador)
@@ -820,9 +911,9 @@ login_sesuite()
 
 
 # Lista de FINs para testar (todos do chamado 184437)
-lista_fin_teste = ["FIN.644984/25", "FIN.549393/24", "FIN.592968/24", "FIN.605532/24",
-                   "FIN.626942/25", "FIN.626943/25"
-]
+# lista_fin_teste = ["FIN.644984/25", "FIN.549393/24", "FIN.592968/24", "FIN.605532/24",
+#                    "FIN.626942/25", "FIN.626943/25"
+# ]
 
 # # Lista de FINs para testar
 # lista_fin_teste = ["FIN.778678/26", "FIN.764097/25", "FIN.742971/25", "FIN.742985/25",
@@ -848,15 +939,31 @@ lista_fin_teste = ["FIN.644984/25", "FIN.549393/24", "FIN.592968/24", "FIN.60553
 #         continue
 
 fins_em_dados = worksheet_fin.col_values(
-    worksheet_fin.row_values(1).index("Número do FIN") + 1
+    worksheet_fin.row_values(1).index("ID_CARD") + 1
 )
+
 fins_em_manuais = [v.strip() for v in worksheet_manuais.col_values(1) if v.strip()]
+fins_ignorados = set(v.strip() for v in worksheet_ignorar.col_values(1) if v.strip())
+
+# Remove FINs ignorados que estão na lista manual
+for fin in fins_em_manuais[:]:  # cópia da lista para iterar
+    if fin in fins_ignorados:
+        print(f"⚠️ {fin} está na lista de ignorados. Removendo da aba Manuais.")
+        todas_linhas = worksheet_manuais.col_values(1)
+        for i, valor in enumerate(todas_linhas):
+            if valor.strip() == fin:
+                worksheet_manuais.delete_rows(i + 1)
+                break
+# Atualiza a lista após remoções
+fins_em_manuais = [v.strip() for v in worksheet_manuais.col_values(1) if v.strip()]
+
+
 
 # --- Primeiro: manuais ---
 print("📌 Iniciando extração de FINs manuais...")
 for idx, fin in enumerate(fins_em_manuais):
     print(f"[MANUAL {idx+1}/{len(fins_em_manuais)}] Processando {fin}")
-
+    
     dados_fin = extrai_fin(fin)
     if not dados_fin:
         print(f"⚠️ {fin} não pôde ser extraído. Mantendo na lista manual.")
@@ -867,16 +974,33 @@ for idx, fin in enumerate(fins_em_manuais):
         print(f"⚠️ {fin} não encontrado na planilha consolidada. Pulando.")
         continue
 
+    titulo_card = linha_com_fin.iloc[0]["Nome da tarefa"]
     numero_tarefa = linha_com_fin.iloc[0]["Numero Tarefa"]
+    
     linha_aquisicao = df_dados_rpa[
         df_dados_rpa["Identificador"].astype(str).str.zfill(6) == str(numero_tarefa).zfill(6)
     ]
+    
     if linha_aquisicao.empty:
-        print(f"⚠️ Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}. Pulando.")
-        continue
+        msg = f"Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}. Título: {titulo_card}"
+        print(f"⚠️ {msg}")
+        registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", msg)
+        continue    
+
 
     dados_aquisicao = linha_aquisicao.iloc[0].to_dict()
+    dados_aquisicao["ID_CARD"] = linha_com_fin.iloc[0].get("Identificação da tarefa", "")
+    
     registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin)
+    
+    # Remove alerta, se existir (FIN foi processado com sucesso)
+    valores_alertas = worksheet_alertas.get_all_values()
+    fins_alertas = [str(linha[0]).strip() for linha in valores_alertas[1:]]
+    if fin in fins_alertas:
+        idx_alerta = fins_alertas.index(fin)
+        worksheet_alertas.delete_rows(idx_alerta + 2)
+        print(f"✅ Alerta do {fin} removido após processamento bem-sucedido.")
+    
 
     todas_linhas = worksheet_manuais.col_values(1)
     for i, valor in enumerate(todas_linhas):
@@ -894,32 +1018,78 @@ lista_fins = df[df["FIN"].notna()]["FIN"].unique().tolist()
 for idx, fin in enumerate(lista_fins):
     print(f"[{idx+1}/{len(lista_fins)}] Processando {fin}")
 
-    if fin in fins_em_dados:
-        print(f"⏭️ {fin} já existe em Dados. Pulando.")
+    # if fin in fins_em_dados:
+    #     print(f"⏭️ {fin} já existe em Dados. Pulando.")
+    #     continue
+
+    if fin in fins_ignorados:
+        print(f"⏭️ {fin} está na lista de ignorados. Pulando.")
         continue
 
-    dados_fin = extrai_fin(fin)
-    if not dados_fin:
-        print(f"❌ Falha ao extrair dados do {fin}.")
-        continue
+    # dados_fin = extrai_fin(fin)
+    # if not dados_fin:
+    #     print(f"❌ Falha ao extrair dados do {fin}.")
+    #     continue
 
+    # linha_com_fin = df[df["FIN"] == fin]
     linha_com_fin = df[df["FIN"] == fin]
     if linha_com_fin.empty:
         print(f"⚠️ {fin} não encontrado na planilha consolidada. Pulando.")
         continue
 
+    id_card_atual = linha_com_fin.iloc[0].get("Identificação da tarefa", "")
+    
+    if id_card_atual in fins_em_dados:
+        print(f"⏭️ Card {id_card_atual} ({fin}) já existe em Dados. Pulando.")
+        continue
+
+    titulo_card = linha_com_fin.iloc[0]["Nome da tarefa"]
+    numero_doc_card = extrair_numero_documento_card(titulo_card)
     numero_tarefa = linha_com_fin.iloc[0]["Numero Tarefa"]
+    
+    dados_fin = extrai_fin(fin)
+    if not dados_fin:
+        msg = f"Falha ao extrair dados do FIN. Título: {titulo_card}"
+        print(f"❌ {msg}")
+        registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", msg)
+        continue    
+    
+    # Validação: número do documento
+    if numero_doc_card:
+        doc_fiscal_fin = dados_fin.get("_doc_fiscal_validacao", "")
+        if doc_fiscal_fin and numero_doc_card != doc_fiscal_fin:
+            msg = f"Número do documento divergente. Card: {numero_doc_card} | FIN: {doc_fiscal_fin} | Título: {titulo_card}"
+            print(f"⚠️ ATENÇÃO: {msg}")
+            registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", msg)
+            continue
+    else:
+        msg = f"Título do card sem 'NF nº:' para validação. Título: {titulo_card}"
+        print(f"⚠️ ATENÇÃO: {msg}")
+        registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", msg)
+
 
     linha_aquisicao = df_dados_rpa[
         df_dados_rpa["Identificador"].astype(str).str.zfill(6) == str(numero_tarefa).zfill(6)
     ]
     if linha_aquisicao.empty:
-        print(f"⚠️ Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}. Pulando.")
+        msg = f"Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}. Título: {titulo_card}"
+        print(f"⚠️ {msg}")
+        registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", msg)
         continue
 
     dados_aquisicao = linha_aquisicao.iloc[0].to_dict()
+    dados_aquisicao["ID_CARD"] = id_card_atual
 
     registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin)
+    
+    # Remove alerta, se existir (FIN foi processado com sucesso)
+    valores_alertas = worksheet_alertas.get_all_values()
+    fins_alertas = [str(linha[0]).strip() for linha in valores_alertas[1:]]
+    if fin in fins_alertas:
+        idx_alerta = fins_alertas.index(fin)
+        worksheet_alertas.delete_rows(idx_alerta + 2)
+        print(f"✅ Alerta do {fin} removido após processamento bem-sucedido.")
+    
 
     # Se estava em Manuais, remove de lá após inserir com sucesso em Dados
     if fin in fins_em_manuais:
