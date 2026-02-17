@@ -207,80 +207,7 @@ def consolidar_planilhas(pasta_downloads):
     print(f"✅ Consolidação concluída: {df_final.shape[0]} linhas totais, {df_final.shape[1]} colunas distintas")
     return df_final
 
-############ 1
-# def registrar_alerta(fin, identificador, mensagem, titulo_card=""):
-#     valores = worksheet_alertas.get_all_values()
-#     cabecalho = ["Número do FIN", "Título do Card", "Identificador", "Mensagem", "Data"]
-#     #cabecalho = ["Número do FIN", "Identificador", "Título do Card", "Mensagem", "Data"]
-
-#     if not valores:
-#         worksheet_alertas.append_row(cabecalho, value_input_option="USER_ENTERED")
-#         fins_alertas = []
-#     else:
-#         fins_alertas = [str(linha[0]).strip() for linha in valores[1:]]
-
-#     from datetime import datetime
-#     data_atual = datetime.now().strftime("%d/%m/%Y %H:%M")
-#     #nova_linha = [fin, identificador, titulo_card, mensagem, data_atual]
-#     nova_linha = [fin, titulo_card, identificador, mensagem, data_atual]
-
-#     if fin in fins_alertas:
-#         idx = fins_alertas.index(fin)
-#         worksheet_alertas.update(
-#             values=[nova_linha],
-#             range_name=f"A{idx + 2}",
-#             value_input_option="USER_ENTERED"
-#         )
-#         print(f"🔁 Alerta do {fin} atualizado.")
-#     else:
-#         worksheet_alertas.append_row(nova_linha, value_input_option="USER_ENTERED")
-#         print(f"➕ Alerta do {fin} registrado.")
-############ /1
-
-############ 2
-# def registrar_alerta(fin, identificador, tipo, mensagem, titulo_card=""):
-#     from datetime import datetime
-#     valores = worksheet_alertas.get_all_values()
-#     cabecalho = ["Número do FIN", "Título do Card", "Identificador", "Tipo", "Mensagem", "Data"]
-
-#     if not valores:
-#         worksheet_alertas.append_row(cabecalho, value_input_option="USER_ENTERED")
-#         linhas_dados = []
-#     else:
-#         linhas_dados = valores[1:]
-
-#     data_atual = datetime.now().strftime("%d/%m/%Y %H:%M")
-#     nova_linha = [fin, titulo_card, identificador, tipo, mensagem, data_atual]
-
-#     # Busca por FIN + Tipo
-#     for i, linha in enumerate(linhas_dados):
-#         if str(linha[0]).strip() == fin and (len(linha) > 3 and str(linha[3]).strip() == tipo):
-#             worksheet_alertas.update(
-#                 values=[nova_linha],
-#                 range_name=f"A{i + 2}",
-#                 value_input_option="USER_ENTERED"
-#             )
-#             print(f"🔁 Alerta '{tipo}' do {fin} atualizado.")
-#             return
-
-#     worksheet_alertas.append_row(nova_linha, value_input_option="USER_ENTERED")
-#     print(f"➕ Alerta '{tipo}' do {fin} registrado.")
-
-
-# def remover_alerta(fin, tipo):
-#     valores = worksheet_alertas.get_all_values()
-#     if not valores or len(valores) <= 1:
-#         return
-
-#     for i, linha in enumerate(valores[1:]):
-#         if str(linha[0]).strip() == fin and (len(linha) > 3 and str(linha[3]).strip() == tipo):
-#             worksheet_alertas.delete_rows(i + 2)
-#             print(f"✅ Alerta '{tipo}' do {fin} removido.")
-#             return
-############ /2
-
 # Registrar alerta tendo ID_CARD como chave primária
-
 def registrar_alerta(fin, identificador, tipo, mensagem, titulo_card="", id_card=""):
     from datetime import datetime
     valores = worksheet_alertas.get_all_values()
@@ -419,13 +346,6 @@ df["FIN"] = df["Itens da lista de verificação"].apply(extrair_numero_fin)
 
 #%%
 
-#### Bloco apenas para organizar colunas, pode ser removido depois:
-# colunas = df.columns.tolist()
-# idx = colunas.index("Nome da tarefa")
-# colunas.remove("Numero Tarefa")
-# colunas.insert(idx + 1, "Numero Tarefa")
-# df = df[colunas]
-
 # Exportar DF para Excel:
 #df.to_excel("df.xlsx", index=False)
 
@@ -484,15 +404,6 @@ def extrai_fin(numfin):
         print(f"❌ Não foi possível localizar o campo de busca do {numfin}. Pulando.")
         return None
     
-    # for xpath_input in xpaths_input:
-    #     try:
-    #         inserir_compra = WebDriverWait(driver, 3).until(
-    #             EC.element_to_be_clickable((By.XPATH, xpath_input))
-    #         )
-    #         break
-    #     except:
-    #         continue
-    
     inserir_fin.clear()
     #sleep(1)
     inserir_fin.send_keys(str(numfin))
@@ -534,12 +445,6 @@ def extrai_fin(numfin):
     
     dados_dos_chamados = {}
     
-    # titulo_element = WebDriverWait(driver, 10).until(
-    # EC.presence_of_element_located((By.XPATH, '//*[@id="headerTitle"]'))
-    # )
-    # titulo_completo = titulo_element.text.strip()
-    # titulo_limpo = titulo_completo.split(" - ", 1)[1] if " - " in titulo_completo else ""
-    
     try:
         titulo_element = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.XPATH, '//*[@id="headerTitle"]'))
@@ -557,11 +462,6 @@ def extrai_fin(numfin):
         EC.presence_of_element_located((By.XPATH, '//*[@id="statusTextSpan"]'))
     )
     status_texto = status_element.text.strip()
-    
-    # frames = driver.find_elements(By.TAG_NAME, "iframe")
-    # print(len(frames))
-    # for f in frames:
-    #     print(f.get_attribute("name"), f.get_attribute("id"))
         
     ## Troca para o frame
     try:
@@ -583,7 +483,6 @@ def extrai_fin(numfin):
     #     id_ = iframe.get_attribute("id")
     #     src = iframe.get_attribute("src")
     #     print(f"[{i}] name={nome}, id={id_}, src={src}")
-
 
     try:
         WebDriverWait(driver, 10).until(
@@ -669,7 +568,6 @@ def extrai_fin(numfin):
     dados_dos_chamados["Descrição"] = titulo_completo
     
     # Campos que precisam de Mapeamento (Início)
-    
     cod_tipo_documento = dados_dos_chamados.get("Tipo de Documento")
     dados_dos_chamados["Tipo de Documento"] = tipo_documento_map.get(cod_tipo_documento, cod_tipo_documento)
     
@@ -681,7 +579,6 @@ def extrai_fin(numfin):
     
     cod_tipo_compra = dados_dos_chamados.get("Tipo de Compra")
     dados_dos_chamados["Tipo de Compra"] = tipo_compra_map.get(cod_tipo_compra, cod_tipo_compra)
-
     # /Campos que precisam de Mapeamento (Fim)
              
     for janela in driver.window_handles:
@@ -694,11 +591,6 @@ def extrai_fin(numfin):
     dados_dos_chamados["Status"] = status_texto
     
     dados_dos_chamados["_doc_fiscal_validacao"] = doc_fiscal_sesuite
-    
-    #print("Descrição: ", dados_dos_chamados["Descrição"])
-    #print("Número do FIN: ", dados_dos_chamados["Número do FIN"])
-    #print("Valor Líquido a Pagar (R$): ", dados_dos_chamados["Valor Líquido a Pagar (R$)"])
-    #print("Status: ", dados_dos_chamados["Status"])
 
     print("Dados do ", numfin, " extraídos.")
     
@@ -782,35 +674,6 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
     numero_fin = str(linha["Número do FIN"])
     identificador = linha.get("Identificador", "")
 
-    # Tentativa de colocar o saldo no final das linhas do chamado (não deu certo):
-    #       
-    # if numero_fin in fins_existentes:
-    #     idx = fins_existentes.index(numero_fin)
-    #     linha_planilha = idx + 2  # header + base 1
-    #     worksheet_fin.update(
-    #         values=[linha_ordenada],
-    #         range_name=f"A{linha_planilha}"
-    #     )
-    #     print(f"🔁 FIN {numero_fin} atualizado na linha {linha_planilha}.")
-    # else:
-    #     # Verifica se já existe linha de Saldo para o mesmo identificador
-    #     if not df_existente.empty and "Número do FIN" in df_existente.columns:
-    #         idx_saldo_insert = df_existente[
-    #             (df_existente["Identificador"] == identificador)
-    #             & (df_existente["Número do FIN"] == "Saldo")
-    #         ].index
-
-    #         if len(idx_saldo_insert) > 0:
-    #             # Insere ACIMA da linha de Saldo, empurrando ela para baixo
-    #             linha_inserir = idx_saldo_insert[0] + 2  # header + base 1
-    #             worksheet_fin.insert_rows([linha_ordenada], row=linha_inserir)
-    #             print(f"➕ FIN {numero_fin} inserido na linha {linha_inserir}, acima do Saldo.")
-    #         else:
-    #             worksheet_fin.append_row(linha_ordenada)
-    #             print(f"➕ FIN {numero_fin} inserido como nova linha.")
-    #     else:
-    #         worksheet_fin.append_row(linha_ordenada)
-    #         print(f"➕ FIN {numero_fin} inserido como nova linha.")
 
     if id_card in ids_existentes:
         idx = ids_existentes.index(id_card)
@@ -824,59 +687,18 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
     else:
         worksheet_fin.append_row(linha_ordenada, value_input_option="USER_ENTERED")
         print(f"➕ Card {id_card} ({numero_fin}) inserido como nova linha.")
-    
-    # (Re)carrega planilha com cabeçalhos
-    # valores_existentes = worksheet_fin.get_all_values()
-    # df_existente = pd.DataFrame(valores_existentes[1:], columns=valores_existentes[0])
-
 
     # (Re)carrega planilha com cabeçalhos
     valores_existentes = worksheet_fin.get_all_values()
     df_existente = pd.DataFrame(valores_existentes[1:], columns=valores_existentes[0])
 
-    # Tentativa de colocar o saldo no final das linhas do chamado (não deu certo):
-    # Reordena: garante que Saldo fique sempre após todos os FINs do mesmo identificador
-    # if identificador and not df_existente.empty and "Número do FIN" in df_existente.columns:
-    #     idx_saldo_reorder = df_existente[
-    #         (df_existente["Identificador"] == identificador)
-    #         & (df_existente["Número do FIN"] == "Saldo")
-    #     ].index
 
-    #     idx_fins_reorder = df_existente[
-    #         (df_existente["Identificador"] == identificador)
-    #         & (df_existente["Número do FIN"] != "Saldo")
-    #     ].index
-
-    #     if len(idx_saldo_reorder) > 0 and len(idx_fins_reorder) > 0:
-    #         ultimo_fin = idx_fins_reorder[-1]
-    #         linha_saldo_atual = idx_saldo_reorder[0]
-
-    #         if linha_saldo_atual < ultimo_fin:
-    #             # Saldo está antes de algum FIN: move para depois do último FIN
-    #             conteudo_saldo = [str(v) if not isinstance(v, str) else v for v in df_existente.loc[linha_saldo_atual].tolist()]
-    #             worksheet_fin.delete_rows(linha_saldo_atual + 2)
-    #             # Após deletar, o último FIN recua uma linha se estava abaixo do saldo
-    #             row_destino = ultimo_fin + 2 if ultimo_fin < linha_saldo_atual else ultimo_fin + 1
-    #             worksheet_fin.insert_rows([conteudo_saldo], row=row_destino)
-                
-    #             print(f"🔀 Linha Saldo reposicionada após o último FIN do identificador {identificador}.")
-
-    #             # Recarrega após reposicionamento
-    #             valores_existentes = worksheet_fin.get_all_values()
-    #             df_existente = pd.DataFrame(valores_existentes[1:], columns=valores_existentes[0])
-
-
-        
-    
     # Verifica e atualiza linha de saldo
-
     if identificador:
         registros_mesmo_chamado = df_existente[
             (df_existente["Identificador"] == identificador)
             & (df_existente["Número do FIN"] != "Saldo")
         ]
-    
-        #soma_fins = registros_mesmo_chamado["Valor Líquido a Pagar (R$)"].astype(str).str.replace(".", "").str.replace(",", ".").astype(float).sum()
 
         soma_fins = (
                     registros_mesmo_chamado["Valor Líquido a Pagar (R$)"]
@@ -901,9 +723,7 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
             print(f"⚠️ ATENÇÃO: {msg} Identificador: {identificador}.")
             registrar_alerta(numero_fin, identificador, "SALDO_NEGATIVO", msg, id_card=id_card)
         else:
-            #remover_alerta(numero_fin, "SALDO_NEGATIVO")
             remover_alerta(id_card, "SALDO_NEGATIVO")
-            
     
         idx_saldo = df_existente[
             (df_existente["Identificador"] == identificador)
@@ -920,10 +740,7 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
             linha_saldo["Rubrica"] = linha.get("Rubrica", "")
             linha_saldo["Valor Aquisição R$"] = linha.get("Valor Aquisição R$", "")
             linha_saldo["Número do FIN"] = "Saldo"
-            linha_saldo["Valor Bruto a Pagar (R$)"] = f"{saldo:,.2f}".replace(".", "X").replace(",", ".").replace("X", ",")           
-            # linha_saldo = linha.copy()
-            # linha_saldo["Número do FIN"] = "Saldo"
-            # linha_saldo["Valor Líquido a Pagar (R$)"] = f"{saldo:,.2f}".replace(".", "X").replace(",", ".").replace("X", ",")
+            linha_saldo["Valor Bruto a Pagar (R$)"] = f"{saldo:,.2f}".replace(".", "X").replace(",", ".").replace("X", ",")
     
             if len(idx_saldo) > 0:
                 worksheet_fin.update(values=[[linha_saldo[col] for col in df_existente.columns]],
@@ -939,8 +756,6 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
 #%% #########################
 
 login_sesuite()
-
-
 
 fins_em_dados = worksheet_fin.col_values(
     worksheet_fin.row_values(1).index("ID_CARD") + 1
@@ -962,8 +777,7 @@ for fin in fins_em_manuais[:]:  # cópia da lista para iterar
 fins_em_manuais = [v.strip() for v in worksheet_manuais.col_values(1) if v.strip()]
 
 
-
-# --- Primeiro: manuais ---
+#%% --- Primeiro: manuais ---
 print("📌 Iniciando extração de FINs manuais...")
 for idx, fin in enumerate(fins_em_manuais):
     print(f"[MANUAL {idx+1}/{len(fins_em_manuais)}] Processando {fin}")
@@ -985,19 +799,6 @@ for idx, fin in enumerate(fins_em_manuais):
     if linha_com_fin.empty:
         print(f"⚠️ {fin} não encontrado na planilha consolidada. Pulando.")
         continue
-    
-    # dados_fin = extrai_fin(fin)
-    # if not dados_fin:
-    #     print(f"⚠️ {fin} não pôde ser extraído. Mantendo na lista manual.")
-    #     continue
-
-    # linha_com_fin = df[df["FIN"] == fin]
-    # if linha_com_fin.empty:
-    #     print(f"⚠️ {fin} não encontrado na planilha consolidada. Pulando.")
-    #     continue
-
-    # titulo_card = linha_com_fin.iloc[0]["Nome da tarefa"]
-    # numero_tarefa = linha_com_fin.iloc[0]["Numero Tarefa"]
     
     linha_aquisicao = df_dados_rpa[
         df_dados_rpa["Identificador"].astype(str).str.zfill(6) == str(numero_tarefa).zfill(6)
@@ -1021,18 +822,6 @@ for idx, fin in enumerate(fins_em_manuais):
     registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin)
     
     # Remove alerta, se existir (FIN foi processado com sucesso)
-    # valores_alertas = worksheet_alertas.get_all_values()
-    # fins_alertas = [str(linha[0]).strip() for linha in valores_alertas[1:]]
-    # if fin in fins_alertas:
-    #     idx_alerta = fins_alertas.index(fin)
-    #     worksheet_alertas.delete_rows(idx_alerta + 2)
-    #     print(f"✅ Alerta do {fin} removido após processamento bem-sucedido.")
-    
-    # remover_alerta(fin, "FALHA_EXTRACAO")
-    # remover_alerta(fin, "DOC_DIVERGENTE")
-    # remover_alerta(fin, "SEM_NF_CARD")
-    # remover_alerta(fin, "AQUISICAO_NAO_ENCONTRADA")    
-    
     remover_alerta(id_card_atual, "FALHA_EXTRACAO")
     remover_alerta(id_card_atual, "DOC_DIVERGENTE")
     remover_alerta(id_card_atual, "SEM_NF_CARD")
@@ -1050,27 +839,17 @@ for idx, fin in enumerate(fins_em_manuais):
 
 print("✅ Encerrada a extração de FINs manuais. Continuando para os demais...")
 
-# --- Depois: df ---
+#%% --- Depois: df ---
 print("📌 Iniciando extração dos FINs do Planner...")
 lista_fins = df[df["FIN"].notna()]["FIN"].unique().tolist()
 
 for idx, fin in enumerate(lista_fins):
     print(f"[{idx+1}/{len(lista_fins)}] Processando {fin}")
 
-    # if fin in fins_em_dados:
-    #     print(f"⏭️ {fin} já existe em Dados. Pulando.")
-    #     continue
-
     if fin in fins_ignorados:
         print(f"⏭️ {fin} está na lista de ignorados. Pulando.")
         continue
 
-    # dados_fin = extrai_fin(fin)
-    # if not dados_fin:
-    #     print(f"❌ Falha ao extrair dados do {fin}.")
-    #     continue
-
-    # linha_com_fin = df[df["FIN"] == fin]
     linha_com_fin = df[df["FIN"] == fin]
     if linha_com_fin.empty:
         print(f"⚠️ {fin} não encontrado na planilha consolidada. Pulando.")
@@ -1127,18 +906,6 @@ for idx, fin in enumerate(lista_fins):
     registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin)
     
     # Remove alerta, se existir (FIN foi processado com sucesso)
-    # valores_alertas = worksheet_alertas.get_all_values()
-    # fins_alertas = [str(linha[0]).strip() for linha in valores_alertas[1:]]
-    # if fin in fins_alertas:
-    #     idx_alerta = fins_alertas.index(fin)
-    #     worksheet_alertas.delete_rows(idx_alerta + 2)
-    #     print(f"✅ Alerta do {fin} removido após processamento bem-sucedido.")
-        
-    # remover_alerta(fin, "FALHA_EXTRACAO")
-    # remover_alerta(fin, "DOC_DIVERGENTE")
-    # remover_alerta(fin, "SEM_NF_CARD")
-    # remover_alerta(fin, "AQUISICAO_NAO_ENCONTRADA")
-    
     remover_alerta(id_card_atual, "FALHA_EXTRACAO")
     remover_alerta(id_card_atual, "DOC_DIVERGENTE")
     remover_alerta(id_card_atual, "SEM_NF_CARD")
@@ -1154,7 +921,6 @@ for idx, fin in enumerate(lista_fins):
                 worksheet_manuais.delete_rows(i + 1)
                 print(f"🗑️ {fin} removido da aba Manuais.")
                 break
-
 
 print("Finalizando.....")
 
