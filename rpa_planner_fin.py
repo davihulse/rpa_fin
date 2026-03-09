@@ -347,7 +347,7 @@ df["FIN"] = df["Itens da lista de verificação"].apply(extrair_numero_fin)
 #%%
 
 # Exportar DF para Excel:
-#df.to_excel("df.xlsx", index=False)
+df.to_excel("df.xlsx", index=False)
 
 def login_sesuite():
     
@@ -371,10 +371,11 @@ def login_sesuite():
 
 
 def extrai_fin(numfin):
-    #sleep(1)
+    sleep(1)
     
     try:
         driver.get(r'https://sesuite.fiesc.com.br/softexpert/workspace?page=home')
+        WebDriverWait(driver, 30).until(lambda d: d.execute_script('return document.readyState') == 'complete')
     except UnexpectedAlertPresentException:
         try:
             driver.switch_to.alert.accept()
@@ -405,15 +406,17 @@ def extrai_fin(numfin):
         return None
     
     inserir_fin.clear()
-    #sleep(1)
+    WebDriverWait(driver, 30).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+    sleep(1)
     inserir_fin.send_keys(str(numfin))
-    #sleep(1)
+    WebDriverWait(driver, 30).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+    sleep(1)
     inserir_fin.send_keys(Keys.ENTER)
     
     print("Aguardando SE Suite...")
         
     try:
-        primeiro_item = WebDriverWait(driver, 20).until(
+        primeiro_item = WebDriverWait(driver, 30).until(
             EC.element_to_be_clickable((By.XPATH, '//*[@id="st-container"]/div/div/div/div[4]/div/div[2]/div/div/div[2]/div/div[2]/div[1]/span'))
         )
         print("FIN localizado.")
@@ -719,7 +722,7 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
     
         saldo = valor_oc_float - soma_fins
         if saldo < -9.99:
-            msg = f"Saldo negativo: {saldo:,.2f}. Verifique o cruzamento de dados."
+            msg = f"Saldo negativo na soma de FINs: {saldo:,.2f}."
             print(f"⚠️ ATENÇÃO: {msg} Identificador: {identificador}.")
             registrar_alerta(numero_fin, identificador, "SALDO_NEGATIVO", msg, id_card=id_card)
         else:
@@ -805,7 +808,7 @@ for idx, fin in enumerate(fins_em_manuais):
     ]
     
     if linha_aquisicao.empty:
-        msg = f"Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}. Título: {titulo_card}"
+        msg = f"Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}."
         print(f"⚠️ {msg}")
         registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", "AQUISICAO_NAO_ENCONTRADA",
                          msg, titulo_card, id_card=id_card_atual)
@@ -867,7 +870,7 @@ for idx, fin in enumerate(lista_fins):
     
     dados_fin = extrai_fin(fin)
     if not dados_fin:
-        msg = f"Falha ao extrair dados do FIN. Título: {titulo_card}"
+        msg = "Falha ao extrair dados do FIN."
         print(f"❌ {msg}")
         registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", "FALHA_EXTRACAO",
                          msg, titulo_card, id_card=id_card_atual)
@@ -877,13 +880,13 @@ for idx, fin in enumerate(lista_fins):
     if numero_doc_card:
         doc_fiscal_fin = dados_fin.get("_doc_fiscal_validacao", "")
         if doc_fiscal_fin and numero_doc_card != doc_fiscal_fin:
-            msg = f"Número do documento divergente. Card: {numero_doc_card} | FIN: {doc_fiscal_fin} | Título: {titulo_card}"
+            msg = f"Número do documento divergente. Planner: {numero_doc_card} | FIN: {doc_fiscal_fin}"
             print(f"⚠️ ATENÇÃO: {msg}")
             registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", "DOC_DIVERGENTE",
                              msg, titulo_card, id_card=id_card_atual)
             continue
     else:
-        msg = f"Título do card sem 'NF nº:' para validação. Título: {titulo_card}"
+        msg = "Título do card sem 'NF nº:' para validação."
         print(f"⚠️ ATENÇÃO: {msg}")
         registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", "SEM_NF_CARD",
                          msg, titulo_card, id_card=id_card_atual)
@@ -893,7 +896,7 @@ for idx, fin in enumerate(lista_fins):
         df_dados_rpa["Identificador"].astype(str).str.zfill(6) == str(numero_tarefa).zfill(6)
     ]
     if linha_aquisicao.empty:
-        msg = f"Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}. Título: {titulo_card}"
+        msg = f"Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}."
         print(f"⚠️ {msg}")
         registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", "AQUISICAO_NAO_ENCONTRADA",
                          msg, titulo_card, id_card=id_card_atual)
