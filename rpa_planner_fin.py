@@ -185,6 +185,12 @@ def consolidar_planilhas(pasta_downloads):
         "Aquisições ISI Embarcados 2.xlsx"
     ]
 
+    instituto_map = {
+        "Aquisições ISI Manufatura.xlsx": "ISI SM",
+        "Aquisições ISI Laser.xlsx": "ISI PL",
+        "Aquisições ISI Embarcados 2.xlsx": "ISI SE"
+    }    
+    
     dfs = []
     for nome_arquivo in nomes_esperados:
         caminho = os.path.join(pasta_downloads, nome_arquivo)
@@ -193,6 +199,7 @@ def consolidar_planilhas(pasta_downloads):
             continue
         try:
             df = pd.read_excel(caminho)
+            df["Instituto"] = instituto_map.get(nome_arquivo, "")
             #df["__arquivo_origem__"] = nome_arquivo
             dfs.append(df)
             print(f"📥 Planilha carregada: {nome_arquivo} ({df.shape[0]} linhas, {df.shape[1]} colunas)")
@@ -208,10 +215,11 @@ def consolidar_planilhas(pasta_downloads):
     return df_final
 
 # Registrar alerta tendo ID_CARD como chave primária
-def registrar_alerta(fin, identificador, tipo, mensagem, titulo_card="", id_card=""):
+def registrar_alerta(fin, identificador, tipo, mensagem, titulo_card="", id_card="", instituto=""):
     from datetime import datetime
     valores = worksheet_alertas.get_all_values()
-    cabecalho = ["ID_CARD", "Número do FIN", "Título do Card", "Identificador", "Tipo", "Mensagem", "Data"]
+    cabecalho = ["ID_CARD", "Instituto", "Número do FIN", "Título do Card",
+                 "Identificador", "Tipo", "Mensagem", "Data"]
 
     if not valores:
         worksheet_alertas.append_row(cabecalho, value_input_option="USER_ENTERED")
@@ -220,11 +228,11 @@ def registrar_alerta(fin, identificador, tipo, mensagem, titulo_card="", id_card
         linhas_dados = valores[1:]
 
     data_atual = datetime.now().strftime("%d/%m/%Y %H:%M")
-    nova_linha = [id_card, fin, titulo_card, identificador, tipo, mensagem, data_atual]
+    nova_linha = [id_card, instituto, fin, titulo_card, identificador, tipo, mensagem, data_atual]
 
     # Busca por ID_CARD + Tipo
     for i, linha in enumerate(linhas_dados):
-        if str(linha[0]).strip() == id_card and (len(linha) > 4 and str(linha[4]).strip() == tipo):
+        if str(linha[0]).strip() == id_card and (len(linha) > 5 and str(linha[5]).strip() == tipo):
             worksheet_alertas.update(
                 values=[nova_linha],
                 range_name=f"A{i + 2}",
@@ -236,17 +244,30 @@ def registrar_alerta(fin, identificador, tipo, mensagem, titulo_card="", id_card
     worksheet_alertas.append_row(nova_linha, value_input_option="USER_ENTERED")
     print(f"➕ Alerta '{tipo}' do card {id_card} registrado.")
 
-
-def remover_alerta(id_card, tipo):
+#def remover_alerta(id_card, tipo):
+def remover_alerta(id_card, tipo, numero_fin=None):
     valores = worksheet_alertas.get_all_values()
     if not valores or len(valores) <= 1:
         return
+    
+    # for i, linha in enumerate(valores[1:]):
+    #     if str(linha[0]).strip() == id_card and (len(linha) > 5 and str(linha[5]).strip() == tipo):
+    #         worksheet_alertas.delete_rows(i + 2)
+    #         print(f"✅ Alerta '{tipo}' do card {id_card} removido.")
+    #         return
 
     for i, linha in enumerate(valores[1:]):
-        if str(linha[0]).strip() == id_card and (len(linha) > 4 and str(linha[4]).strip() == tipo):
+        # Verifica por ID_CARD + Tipo
+        match_id = str(linha[0]).strip() == id_card
+        # OU verifica por Número do FIN + Tipo (fallback para alertas órfãos)
+        match_fin = numero_fin and len(linha) > 2 and str(linha[2]).strip() == numero_fin
+        match_tipo = len(linha) > 5 and str(linha[5]).strip() == tipo
+        
+        if (match_id or match_fin) and match_tipo:
             worksheet_alertas.delete_rows(i + 2)
-            print(f"✅ Alerta '{tipo}' do card {id_card} removido.")
+            print(f"✅ Alerta '{tipo}' removido (ID_CARD={id_card}, FIN={numero_fin}).")
             return
+
 
 #%% #######################
 
@@ -612,8 +633,8 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
         "Número do FIN", "Descrição FIN", "Status FIN", "Data da Abertura do FIN",
         "Tipo de Documento", "Especificação", "Valor pago por Adiantamento?",
         "Filial Faturada", "CNPJ Fornecedor", "Número do documento", "Tipo de Compra",
-        "Ordem de compra (FIN)", "Contrato (FIN)", "Registro Gerado (Apontamento)",
-        "RNs", "Observações", "Número AP", "Data Agendada para Pagamento", "Competência",
+        "Ordem de compra (FIN)", "Registro Gerado (Apontamento)", "RNs", "Observações",
+        "Número AP", "Data Agendada para Pagamento", "Competência",
         "Valor Bruto a Pagar (R$)", "Valor a deduzir (R$)", "Valor Líquido a Pagar (R$)",
         "Nr. do documento (CAP)"
     ]
@@ -648,7 +669,8 @@ def registrar_fin_google_sheets(dados_fin, dados_aquisicao, worksheet_fin):
         "CNPJ Fornecedor": dados_fin.get("CNPJ Fornecedor", ""),
         "Número do documento": dados_fin.get("Número do documento", ""),
         "Tipo de Compra": dados_fin.get("Tipo de Compra", ""),
-        "Ordem de compra (FIN)": dados_fin.get("Ordem de compra (FIN)", ""),
+        "Ordem de compra (FIN)": dados_fin.get("Ordem de compra (FIN)", "") or dados_fin.get("Contrato (FIN)", ""),
+        #"Ordem de compra (FIN)": dados_fin.get("Ordem de compra (FIN)", ""),
         "Contrato (FIN)": dados_fin.get("Contrato (FIN)", ""),
         "Registro Gerado (Apontamento)": dados_fin.get("Registro Gerado (Apontamento)", ""), 
         "RNs": dados_fin.get("RNs", ""),
@@ -780,6 +802,28 @@ for fin in fins_em_manuais[:]:  # cópia da lista para iterar
 fins_em_manuais = [v.strip() for v in worksheet_manuais.col_values(1) if v.strip()]
 
 
+# Remove alertas de FINs ignorados
+
+# Remove alertas de FINs ignorados
+print("🧹 Removendo alertas de FINs ignorados...")
+print(f"FINs ignorados: {fins_ignorados}")
+for fin_ignorado in fins_ignorados:
+    print(f"Processando FIN ignorado: {fin_ignorado}")
+    linha_ignorada = df[df["FIN"] == fin_ignorado]
+    if not linha_ignorada.empty:
+        id_card_ignorado = linha_ignorada.iloc[0].get("Identificação da tarefa", "")
+        print(f"  -> ID_CARD: {id_card_ignorado}")
+        if id_card_ignorado:
+            remover_alerta(id_card_ignorado, "FALHA_EXTRACAO", fin_ignorado)
+            sleep(1)
+            remover_alerta(id_card_ignorado, "DOC_DIVERGENTE", fin_ignorado)
+            sleep(1)
+            remover_alerta(id_card_ignorado, "SEM_NF_CARD", fin_ignorado)
+            sleep(1)
+            remover_alerta(id_card_ignorado, "AQUISICAO_NAO_ENCONTRADA", fin_ignorado)
+            sleep(1)
+
+
 #%% --- Primeiro: manuais ---
 print("📌 Iniciando extração de FINs manuais...")
 for idx, fin in enumerate(fins_em_manuais):
@@ -789,14 +833,15 @@ for idx, fin in enumerate(fins_em_manuais):
     titulo_card = linha_com_fin.iloc[0]["Nome da tarefa"] if not linha_com_fin.empty else ""
     numero_tarefa = linha_com_fin.iloc[0]["Numero Tarefa"] if not linha_com_fin.empty else ""
     id_card_atual = linha_com_fin.iloc[0].get("Identificação da tarefa", "") if not linha_com_fin.empty else ""
+    instituto = linha_com_fin.iloc[0].get("Instituto", "") if not linha_com_fin.empty else ""
     
     dados_fin = extrai_fin(fin)
     
     if not dados_fin:
         msg = "Falha ao extrair dados do FIN."
         print(f"⚠️ {msg}")
-        registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "",
-                         "FALHA_EXTRACAO", msg, titulo_card, id_card=id_card_atual)
+        registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", "FALHA_EXTRACAO",
+                         msg, titulo_card, id_card=id_card_atual, instituto=instituto)
         continue
 
     if linha_com_fin.empty:
@@ -811,7 +856,7 @@ for idx, fin in enumerate(fins_em_manuais):
         msg = f"Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}."
         print(f"⚠️ {msg}")
         registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", "AQUISICAO_NAO_ENCONTRADA",
-                         msg, titulo_card, id_card=id_card_atual)
+                         msg, titulo_card, id_card=id_card_atual, instituto=instituto)
         continue    
 
     dados_aquisicao = linha_aquisicao.iloc[0].to_dict()
@@ -826,9 +871,13 @@ for idx, fin in enumerate(fins_em_manuais):
     
     # Remove alerta, se existir (FIN foi processado com sucesso)
     remover_alerta(id_card_atual, "FALHA_EXTRACAO")
+    sleep(1)
     remover_alerta(id_card_atual, "DOC_DIVERGENTE")
+    sleep(1)
     remover_alerta(id_card_atual, "SEM_NF_CARD")
+    sleep(1)
     remover_alerta(id_card_atual, "AQUISICAO_NAO_ENCONTRADA")
+    sleep(1)
     
     # /Remove alerta, se existir (FIN foi processado com sucesso)
     
@@ -867,29 +916,37 @@ for idx, fin in enumerate(lista_fins):
     titulo_card = linha_com_fin.iloc[0]["Nome da tarefa"]
     numero_doc_card = extrair_numero_documento_card(titulo_card)
     numero_tarefa = linha_com_fin.iloc[0]["Numero Tarefa"]
+    instituto = linha_com_fin.iloc[0].get("Instituto", "")
     
     dados_fin = extrai_fin(fin)
     if not dados_fin:
         msg = "Falha ao extrair dados do FIN."
         print(f"❌ {msg}")
         registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", "FALHA_EXTRACAO",
-                         msg, titulo_card, id_card=id_card_atual)
+                         msg, titulo_card, id_card=id_card_atual, instituto=instituto)
         continue    
     
     # Validação: número do documento
     if numero_doc_card:
         doc_fiscal_fin = dados_fin.get("_doc_fiscal_validacao", "")
-        if doc_fiscal_fin and numero_doc_card != doc_fiscal_fin:
+        # Remove zeros à esquerda de ambos para comparação
+        numero_doc_card_sem_zeros = numero_doc_card.lstrip('0')
+        doc_fiscal_fin_sem_zeros = doc_fiscal_fin.lstrip('0') if doc_fiscal_fin else ''
+        if doc_fiscal_fin and numero_doc_card_sem_zeros != doc_fiscal_fin_sem_zeros:
+
+    # if numero_doc_card:
+    #     doc_fiscal_fin = dados_fin.get("_doc_fiscal_validacao", "")
+    #     if doc_fiscal_fin and numero_doc_card != doc_fiscal_fin:
             msg = f"Número do documento divergente. Planner: {numero_doc_card} | FIN: {doc_fiscal_fin}"
             print(f"⚠️ ATENÇÃO: {msg}")
             registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", "DOC_DIVERGENTE",
-                             msg, titulo_card, id_card=id_card_atual)
+                             msg, titulo_card, id_card=id_card_atual, instituto=instituto)
             continue
     else:
         msg = "Título do card sem 'NF nº:' para validação."
         print(f"⚠️ ATENÇÃO: {msg}")
         registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", "SEM_NF_CARD",
-                         msg, titulo_card, id_card=id_card_atual)
+                         msg, titulo_card, id_card=id_card_atual, instituto=instituto)
 
 
     linha_aquisicao = df_dados_rpa[
@@ -899,7 +956,7 @@ for idx, fin in enumerate(lista_fins):
         msg = f"Nenhuma aquisição encontrada para a Tarefa {numero_tarefa}."
         print(f"⚠️ {msg}")
         registrar_alerta(fin, str(numero_tarefa) if numero_tarefa else "", "AQUISICAO_NAO_ENCONTRADA",
-                         msg, titulo_card, id_card=id_card_atual)
+                         msg, titulo_card, id_card=id_card_atual, instituto=instituto)
         continue
 
     dados_aquisicao = linha_aquisicao.iloc[0].to_dict()
@@ -910,10 +967,13 @@ for idx, fin in enumerate(lista_fins):
     
     # Remove alerta, se existir (FIN foi processado com sucesso)
     remover_alerta(id_card_atual, "FALHA_EXTRACAO")
+    sleep(1)
     remover_alerta(id_card_atual, "DOC_DIVERGENTE")
+    sleep(1)
     remover_alerta(id_card_atual, "SEM_NF_CARD")
+    sleep(1)
     remover_alerta(id_card_atual, "AQUISICAO_NAO_ENCONTRADA")
-    
+    sleep(1)    
     # /Remove alerta, se existir (FIN foi processado com sucesso)
 
     # Se estava em Manuais, remove de lá após inserir com sucesso em Dados
@@ -925,6 +985,70 @@ for idx, fin in enumerate(lista_fins):
                 print(f"🗑️ {fin} removido da aba Manuais.")
                 break
 
+#%% Recalculando saldos de todos os identificadores:
+
+print("📊 Recalculando saldos de todos os identificadores...")
+
+# Recarrega planilha completa
+valores_existentes = worksheet_fin.get_all_values()
+df_completo = pd.DataFrame(valores_existentes[1:], columns=valores_existentes[0])
+
+# Lista de identificadores únicos (excluindo Saldo)
+identificadores_unicos = df_completo[
+    (df_completo["Identificador"] != "") & 
+    (df_completo["Número do FIN"] != "Saldo")
+]["Identificador"].unique()
+
+for identificador in identificadores_unicos:
+    # Filtra FINs deste identificador
+    registros = df_completo[
+        (df_completo["Identificador"] == identificador) &
+        (df_completo["Número do FIN"] != "Saldo")
+    ]
+    
+    if registros.empty:
+        continue
+    
+    # Soma valores líquidos
+    soma_fins = (
+        registros["Valor Líquido a Pagar (R$)"]
+        .astype(str)
+        .str.strip()
+        .str.replace(r"\.", "", regex=True)
+        .str.replace(",", ".", regex=False)
+        .pipe(pd.to_numeric, errors="coerce")
+        .fillna(0)
+        .sum()
+    )
+    
+    # Pega valor da aquisição (primeira linha)
+    valor_aquisicao_str = registros.iloc[0]["Valor Aquisição R$"]
+    try:
+        valor_aquisicao = float(str(valor_aquisicao_str).replace(".", "").replace(",", "."))
+    except:
+        valor_aquisicao = 0.0
+    
+    saldo = valor_aquisicao - soma_fins
+    
+    # Pega ID_CARD e FIN da primeira linha para o alerta
+    id_card_ref = registros.iloc[0]["ID_CARD"]
+    numero_fin_ref = registros.iloc[0]["Número do FIN"]
+    
+    # Atualiza ou remove alerta
+    if saldo < -9.99:
+        msg = f"Saldo negativo: {saldo:,.2f}. Verifique o cruzamento de dados."
+        instituto_ref = registros.iloc[0]["Instituto"] if "Instituto" in registros.columns else ""
+        registrar_alerta(numero_fin_ref, identificador, "SALDO_NEGATIVO", msg, id_card=id_card_ref, instituto=instituto_ref)
+        #registrar_alerta(numero_fin_ref, identificador, "SALDO_NEGATIVO", msg, id_card=id_card_ref)
+    else:
+        remover_alerta(id_card_ref, "SALDO_NEGATIVO")
+    
+    sleep(1.5)
+
+print("✅ Recálculo de saldos concluído.")
+
 print("Finalizando.....")
 
 driver.quit()
+
+sleep(3)
