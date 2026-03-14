@@ -52,7 +52,7 @@ def criar_driver(pasta_downloads):
 def login_microsoft(driver):
     davpass = open(os.path.join(os.path.dirname(os.getcwd()), '.cpass'), 'r').read()    
 
-    print("Realizando Login...")
+    print("Realizando Login Microsoft...")
 
     # WebDriverWait(driver, 20).until(
     #     EC.presence_of_element_located((By.ID, "i0116"))
@@ -986,66 +986,141 @@ for idx, fin in enumerate(lista_fins):
                 break
 
 #%% Recalculando saldos de todos os identificadores:
+### Removido pois demorava demais, calculava todos os milhares de saldos.
 
-print("📊 Recalculando saldos de todos os identificadores...")
+# print("📊 Recalculando saldos de todos os identificadores...")
 
-# Recarrega planilha completa
-valores_existentes = worksheet_fin.get_all_values()
-df_completo = pd.DataFrame(valores_existentes[1:], columns=valores_existentes[0])
+# # Recarrega planilha completa
+# valores_existentes = worksheet_fin.get_all_values()
+# df_completo = pd.DataFrame(valores_existentes[1:], columns=valores_existentes[0])
 
-# Lista de identificadores únicos (excluindo Saldo)
-identificadores_unicos = df_completo[
-    (df_completo["Identificador"] != "") & 
-    (df_completo["Número do FIN"] != "Saldo")
-]["Identificador"].unique()
+# # Lista de identificadores únicos (excluindo Saldo)
+# identificadores_unicos = df_completo[
+#     (df_completo["Identificador"] != "") & 
+#     (df_completo["Número do FIN"] != "Saldo")
+# ]["Identificador"].unique()
 
-for identificador in identificadores_unicos:
-    # Filtra FINs deste identificador
-    registros = df_completo[
-        (df_completo["Identificador"] == identificador) &
-        (df_completo["Número do FIN"] != "Saldo")
-    ]
+# for identificador in identificadores_unicos:
+#     # Filtra FINs deste identificador
+#     registros = df_completo[
+#         (df_completo["Identificador"] == identificador) &
+#         (df_completo["Número do FIN"] != "Saldo")
+#     ]
     
-    if registros.empty:
-        continue
+#     if registros.empty:
+#         continue
     
-    # Soma valores líquidos
-    soma_fins = (
-        registros["Valor Líquido a Pagar (R$)"]
-        .astype(str)
-        .str.strip()
-        .str.replace(r"\.", "", regex=True)
-        .str.replace(",", ".", regex=False)
-        .pipe(pd.to_numeric, errors="coerce")
-        .fillna(0)
-        .sum()
-    )
+#     # Soma valores líquidos
+#     soma_fins = (
+#         registros["Valor Líquido a Pagar (R$)"]
+#         .astype(str)
+#         .str.strip()
+#         .str.replace(r"\.", "", regex=True)
+#         .str.replace(",", ".", regex=False)
+#         .pipe(pd.to_numeric, errors="coerce")
+#         .fillna(0)
+#         .sum()
+#     )
     
-    # Pega valor da aquisição (primeira linha)
-    valor_aquisicao_str = registros.iloc[0]["Valor Aquisição R$"]
-    try:
-        valor_aquisicao = float(str(valor_aquisicao_str).replace(".", "").replace(",", "."))
-    except:
-        valor_aquisicao = 0.0
+#     # Pega valor da aquisição (primeira linha)
+#     valor_aquisicao_str = registros.iloc[0]["Valor Aquisição R$"]
+#     try:
+#         valor_aquisicao = float(str(valor_aquisicao_str).replace(".", "").replace(",", "."))
+#     except:
+#         valor_aquisicao = 0.0
     
-    saldo = valor_aquisicao - soma_fins
+#     saldo = valor_aquisicao - soma_fins
     
-    # Pega ID_CARD e FIN da primeira linha para o alerta
-    id_card_ref = registros.iloc[0]["ID_CARD"]
-    numero_fin_ref = registros.iloc[0]["Número do FIN"]
+#     # Pega ID_CARD e FIN da primeira linha para o alerta
+#     id_card_ref = registros.iloc[0]["ID_CARD"]
+#     numero_fin_ref = registros.iloc[0]["Número do FIN"]
     
-    # Atualiza ou remove alerta
-    if saldo < -9.99:
-        msg = f"Saldo negativo: {saldo:,.2f}. Verifique o cruzamento de dados."
-        instituto_ref = registros.iloc[0]["Instituto"] if "Instituto" in registros.columns else ""
-        registrar_alerta(numero_fin_ref, identificador, "SALDO_NEGATIVO", msg, id_card=id_card_ref, instituto=instituto_ref)
-        #registrar_alerta(numero_fin_ref, identificador, "SALDO_NEGATIVO", msg, id_card=id_card_ref)
-    else:
-        remover_alerta(id_card_ref, "SALDO_NEGATIVO")
+#     # Atualiza ou remove alerta
+#     if saldo < -9.99:
+#         msg = f"Saldo negativo: {saldo:,.2f}. Verifique o cruzamento de dados."
+#         instituto_ref = registros.iloc[0]["Instituto"] if "Instituto" in registros.columns else ""
+#         registrar_alerta(numero_fin_ref, identificador, "SALDO_NEGATIVO", msg, id_card=id_card_ref, instituto=instituto_ref)
+#         #registrar_alerta(numero_fin_ref, identificador, "SALDO_NEGATIVO", msg, id_card=id_card_ref)
+#     else:
+#         remover_alerta(id_card_ref, "SALDO_NEGATIVO")
     
-    sleep(1.5)
+#     sleep(1.5)
 
-print("✅ Recálculo de saldos concluído.")
+# print("✅ Recálculo de saldos concluído.")
+
+#%%
+
+print("📊 Verificando alertas de saldo existentes...")
+
+# Carrega apenas os alertas de SALDO_NEGATIVO
+valores_alertas = worksheet_alertas.get_all_values()
+
+df_alertas = pd.DataFrame(valores_alertas[1:], columns=valores_alertas[0]) if len(valores_alertas) > 1 else pd.DataFrame()
+
+alertas_saldo = df_alertas[df_alertas["Tipo"] == "SALDO_NEGATIVO"][["ID_CARD", "Identificador"]].to_dict('records') if not df_alertas.empty else []
+
+
+if not alertas_saldo:
+    print("✅ Nenhum alerta de saldo para verificar.")
+else:
+    print(f"Encontrados {len(alertas_saldo)} alertas de saldo para verificar.")
+    
+    # Carrega planilha de dados
+    valores_existentes = worksheet_fin.get_all_values()
+    df_completo = pd.DataFrame(valores_existentes[1:], columns=valores_existentes[0])
+    
+    for alerta in alertas_saldo:
+        identificador = alerta["Identificador"]
+        id_card_ref = alerta["ID_CARD"]    
+    
+        # Filtra FINs deste identificador
+        registros = df_completo[
+            (df_completo["Identificador"] == identificador) &
+            (df_completo["Número do FIN"] != "Saldo")
+        ]
+        
+        if registros.empty:
+            print(f"⚠️ Identificador {identificador} não encontrado na planilha. Removendo alerta.")
+            remover_alerta(id_card_ref, "SALDO_NEGATIVO")
+            sleep(1)
+            continue
+        
+        # Soma valores líquidos
+        soma_fins = (
+            registros["Valor Líquido a Pagar (R$)"]
+            .astype(str).str.strip()
+            .str.replace(r"\.", "", regex=True)
+            .str.replace(",", ".", regex=False)
+            .pipe(pd.to_numeric, errors="coerce")
+            .fillna(0).sum()
+        )
+        
+        # Pega valor da aquisição
+        valor_aquisicao_str = registros.iloc[0]["Valor Aquisição R$"]
+        try:
+            valor_aquisicao = float(str(valor_aquisicao_str).replace(".", "").replace(",", "."))
+        except:
+            valor_aquisicao = 0.0
+        
+        saldo = valor_aquisicao - soma_fins
+        
+        numero_fin_ref = registros.iloc[0]["Número do FIN"]
+        instituto_ref = registros.iloc[0].get("Instituto", "")
+        
+        # Atualiza ou remove alerta
+        if saldo < -9.99:
+            msg = f"Saldo negativo: {saldo:,.2f}. Verifique o cruzamento de dados."
+            registrar_alerta(numero_fin_ref, identificador, "SALDO_NEGATIVO", msg, id_card=id_card_ref, instituto=instituto_ref)
+            print(f"🔁 Alerta de saldo atualizado: Identificador {identificador}, saldo {saldo:,.2f}")
+        else:
+            remover_alerta(id_card_ref, "SALDO_NEGATIVO")
+            print(f"✅ Alerta de saldo removido: Identificador {identificador}, saldo agora {saldo:,.2f}")
+        
+        sleep(1)
+    
+    print("✅ Verificação de alertas de saldo concluída.")
+    
+    #%%
 
 print("Finalizando.....")
 
