@@ -324,8 +324,13 @@ df = df[~df["Nome do Bucket"].isin(["Brementur", "Pc de Viagem", "PC de Viagem"]
 def extrair_numero_tarefa(texto):
     if pd.isna(texto):
         return None
+    
+    # 1) E-PROC no formato E-PROC.00154.25, EPROC.00154.25, E PROC.00154.25
+    match_eproc = re.search(r"E[\s\-]?PROC\.(\d{5})\.(\d{2})", texto, flags=re.IGNORECASE)
+    if match_eproc:
+        return f"E-PROC.{match_eproc.group(1)}.{match_eproc.group(2)}"
 
-    # 1) Número de tarefa com 5, 6 ou 7 dígitos
+    # 2) Número de tarefa com 5, 6 ou 7 dígitos
     match_num = re.search(r"(?:Tarefa|Chamado)[^0-9]{0,10}(\d{5,7})", texto, flags=re.IGNORECASE)
     if match_num:
         return match_num.group(1).zfill(6)
@@ -895,6 +900,10 @@ print("✅ Encerrada a extração de FINs manuais. Continuando para os demais...
 print("📌 Iniciando extração dos FINs do Planner...")
 lista_fins = df[df["FIN"].notna()]["FIN"].unique().tolist()
 
+# Carrega dados existentes para verificar status
+valores_dados = worksheet_fin.get_all_values()
+df_completo = pd.DataFrame(valores_dados[1:], columns=valores_dados[0])
+
 for idx, fin in enumerate(lista_fins):
     print(f"[{idx+1}/{len(lista_fins)}] Processando {fin}")
 
@@ -910,8 +919,20 @@ for idx, fin in enumerate(lista_fins):
     id_card_atual = linha_com_fin.iloc[0].get("Identificação da tarefa", "")
     
     if id_card_atual in fins_em_dados:
-        print(f"⏭️ Card {id_card_atual} ({fin}) já existe em Dados. Pulando.")
-        continue
+        # Verifica se o FIN já está encerrado
+        linha_existente = df_completo[df_completo["ID_CARD"] == id_card_atual]
+        if not linha_existente.empty:
+            status_atual = str(linha_existente.iloc[0].get("Status FIN", "")).strip()
+            if status_atual.lower() == "encerrado":
+                continue
+            else:
+                continue
+
+    # id_card_atual = linha_com_fin.iloc[0].get("Identificação da tarefa", "")
+    
+    # if id_card_atual in fins_em_dados:
+    #     print(f"⏭️ Card {id_card_atual} ({fin}) já existe em Dados. Pulando.")
+    #     continue
 
     titulo_card = linha_com_fin.iloc[0]["Nome da tarefa"]
     numero_doc_card = extrair_numero_documento_card(titulo_card)
@@ -1037,7 +1058,7 @@ for idx, fin in enumerate(lista_fins):
     
 #     # Atualiza ou remove alerta
 #     if saldo < -9.99:
-#         msg = f"Saldo negativo: {saldo:,.2f}. Verifique o cruzamento de dados."
+#         msg = f"Saldo negativo na aquisição: {saldo:,.2f}."
 #         instituto_ref = registros.iloc[0]["Instituto"] if "Instituto" in registros.columns else ""
 #         registrar_alerta(numero_fin_ref, identificador, "SALDO_NEGATIVO", msg, id_card=id_card_ref, instituto=instituto_ref)
 #         #registrar_alerta(numero_fin_ref, identificador, "SALDO_NEGATIVO", msg, id_card=id_card_ref)
@@ -1109,7 +1130,7 @@ else:
         
         # Atualiza ou remove alerta
         if saldo < -9.99:
-            msg = f"Saldo negativo: {saldo:,.2f}. Verifique o cruzamento de dados."
+            msg = f"Saldo negativo na Aquisição: {saldo:,.2f}."
             registrar_alerta(numero_fin_ref, identificador, "SALDO_NEGATIVO", msg, id_card=id_card_ref, instituto=instituto_ref)
             print(f"🔁 Alerta de saldo atualizado: Identificador {identificador}, saldo {saldo:,.2f}")
         else:
