@@ -304,7 +304,7 @@ planners_urls = [
     "https://planner.cloud.microsoft/webui/plan/By2-rKiP6EWT0TfgDNLG12QAGgc8/view/board?tid=2cf7d4d5-bd1b-4956-acf8-2995399b2168"
 ]
 
-pasta_downloads = r"C:\RPA\rpa_fin\Downloads"
+pasta_downloads = r"C:\RPA\RPA.0002-rpa_fin\Downloads"
 driver = criar_driver(pasta_downloads)
 
 #Comentar as 3 linhas abaixo para pular o Download dos Planners em Excel
