@@ -275,7 +275,8 @@ def remover_alerta(id_card, tipo, numero_fin=None):
 gc = gspread.service_account(filename=os.path.join(os.path.dirname(os.getcwd()), 'crested-century-386316-01c90985d6e4.json'))
 
 #Dados Aquisições RPA
-spreadsheet_rpa = gc.open("Acompanhamento_Aquisições_RPA")
+#spreadsheet_rpa = gc.open("Acompanhamento_Aquisições_RPA")
+spreadsheet_rpa = gc.open_by_key("126MArpQRv1e-_YXseuxZZyi9vqOmo3xJmRnwjOgyswQ")
 worksheet_rpa = spreadsheet_rpa.worksheet("Dados")
 dados_rpa = worksheet_rpa.get_all_values()
 
@@ -291,7 +292,8 @@ df_dados_rpa['Valor R$'] = df_dados_rpa['Valor R$'].str.replace('.', '', regex=F
 
 
 #Dados FIN RPA - planilha destino
-spreadsheet_fin = gc.open("Acompanhamento_FIN_RPA")
+#spreadsheet_fin = gc.open("Acompanhamento_FIN_RPA")
+spreadsheet_fin = gc.open_by_key("1FuVcskoAywwkGROl6wseS8Wp8tbqz9M_fRcYK2FpGT0")
 worksheet_fin = spreadsheet_fin.worksheet("Dados")
 worksheet_manuais = spreadsheet_fin.worksheet("Manuais")
 worksheet_ignorar = spreadsheet_fin.worksheet("Ignorar")
